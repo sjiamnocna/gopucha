@@ -4,7 +4,10 @@
 *.dll
 *.so
 *.dylib
-gopucha
+
+# Binary names (Linux first-class, Windows supported)
+/gopucha
+/gopucha.exe
 
 # Test binary, built with `go test -c`
 *.test

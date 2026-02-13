@@ -45,19 +45,25 @@ OOOOOOOOOOOOOOOOOOOO
 ## Installation
 
 ```bash
-go build -o gopucha .
+go build -o gopucha ./cmd/gopucha
 ```
 
 ## Usage
 
+Run with default maps:
 ```bash
-./gopucha <map-file>
+./gopucha
 ```
 
-Example:
+Run with a specific map file:
 ```bash
-./gopucha maps.txt
-./gopucha simple.txt
+./gopucha maps/maps.txt
+./gopucha simple.txt  # Automatically looks in maps/ directory
+```
+
+Or specify a full path:
+```bash
+./gopucha /path/to/custom/map.txt
 ```
 
 ## Controls
@@ -80,7 +86,9 @@ Press Enter after each command.
 
 ## Example Maps
 
-Two example map files are included:
-- `simple.txt`: A small simple map for testing
-- `maps.txt`: Three progressively challenging levels
+Two example map files are included in the `maps/` directory:
+- `maps/simple.txt`: A small simple map for testing
+- `maps/maps.txt`: Three progressively challenging levels
+
+By default, the game loads `maps/maps.txt`. You can specify just the filename (e.g., `simple.txt`) and the game will automatically look in the `maps/` directory.
 

@@ -1,4 +1,4 @@
-package main
+package gopucha
 
 import (
 	"math/rand"
