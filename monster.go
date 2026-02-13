@@ -97,22 +97,22 @@ func (mo *Monster) turn(m *Map) {
 	}
 	
 	// Don't go backwards if other options exist
-	var forward Direction
+	var backward Direction
 	switch mo.Direction {
 	case Up:
-		forward = Down
+		backward = Down
 	case Down:
-		forward = Up
+		backward = Up
 	case Left:
-		forward = Right
+		backward = Right
 	case Right:
-		forward = Left
+		backward = Left
 	}
 	
 	// Filter out backwards direction if there are other options
 	filteredDirs := []Direction{}
 	for _, d := range directions {
-		if d != forward || len(directions) == 1 {
+		if d != backward || len(directions) == 1 {
 			filteredDirs = append(filteredDirs, d)
 		}
 	}

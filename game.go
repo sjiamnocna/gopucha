@@ -71,11 +71,8 @@ PlayerPlaced:
 			y = g.CurrentMap.Height - 1
 		}
 		
-		// Find nearest non-wall position
-		for !g.CurrentMap.IsWall(x, y) || (x == g.Player.X && y == g.Player.Y) {
-			break
-		}
-		if g.CurrentMap.IsWall(x, y) {
+		// Check if this is a valid position (not a wall and not occupied by player)
+		if g.CurrentMap.IsWall(x, y) || (x == g.Player.X && y == g.Player.Y) {
 			// Search for a valid position
 			found := false
 			for dy := 0; dy < g.CurrentMap.Height && !found; dy++ {
