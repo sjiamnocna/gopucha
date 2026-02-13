@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,11 +10,15 @@ import (
 )
 
 func main() {
+	// Add flag for GUI mode
+	useGUI := flag.Bool("gui", false, "Use GUI mode (requires display)")
+	flag.Parse()
+	
 	// Default to maps directory if no argument provided
 	mapFile := "maps/maps.txt"
 	
-	if len(os.Args) >= 2 {
-		mapFile = os.Args[1]
+	if flag.NArg() >= 1 {
+		mapFile = flag.Arg(0)
 	}
 	
 	// If the path doesn't exist and doesn't contain a directory separator,
@@ -25,9 +30,17 @@ func main() {
 		}
 	}
 	
-	fmt.Printf("Loading map: %s\n", mapFile)
+	var err error
+	if *useGUI {
+		// Run GUI game
+		err = gopucha.RunGUIGame(mapFile)
+	} else {
+		// Run terminal game
+		fmt.Printf("Loading map: %s\n", mapFile)
+		err = gopucha.RunGame(mapFile)
+	}
 	
-	if err := gopucha.RunGame(mapFile); err != nil {
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
