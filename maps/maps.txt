@@ -22,11 +22,11 @@ OOOOOOOOOOOOOOOOOOOOOOOO
 ---
 OOOOOOOOOOOOOOOOOOOOOOOO
 O----------------------O
-O--OOOO----OOOO----OOOO-O
+O--OOOO----OOOO----OOOOO
 O----------------------O
 O------OOOO----OOOO----O
 O----------------------O
-O--OOOO----OOOO----OOOO-O
+O--OOOO----OOOO----OOOOO
 O----------------------O
 O------OOOO----OOOO----O
 OOOOOOOOOOOOOOOOOOOOOOOO
