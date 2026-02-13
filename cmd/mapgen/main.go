@@ -5,7 +5,6 @@ import (
 "fmt"
 "math/rand"
 "os"
-"time"
 )
 
 func main() {
@@ -26,7 +25,7 @@ fmt.Fprintf(os.Stderr, "Height must be at least 5\n")
 os.Exit(1)
 }
 
-rand.Seed(time.Now().UnixNano())
+// Note: rand.Seed deprecated in Go 1.20+, package-level functions auto-seeded
 
 file, err := os.Create(*output)
 if err != nil {

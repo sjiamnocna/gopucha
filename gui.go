@@ -15,7 +15,6 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -171,7 +170,7 @@ func (g *GUIGame) setupGameUI() {
 	infoLabel := widget.NewLabel(fmt.Sprintf("Level: %d | Score: %d | Dots: %d",
 		g.game.CurrentLevel+1, g.game.Score, g.game.CurrentMap.CountDots()))
 	
-	controls := widget.NewLabel("Controls: Arrow Keys to move | CTRL +/- or CTRL+Scroll to zoom | ESC to quit")
+	controls := widget.NewLabel("Controls: Arrow Keys to move | +/- to zoom | ESC to quit")
 	
 	topBar := container.NewVBox(infoLabel, controls)
 	
