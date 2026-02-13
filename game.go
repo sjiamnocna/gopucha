@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os/exec"
 	"time"
 )
 
@@ -154,18 +153,6 @@ func (g *Game) HandleInput(input string) {
 	case 'q', 'Q':
 		g.GameOver = true
 	}
-}
-
-// enableRawMode enables raw mode for terminal input
-func enableRawMode() {
-	exec.Command("stty", "-f", "/dev/tty", "cbreak", "min", "1").Run()
-	exec.Command("stty", "-f", "/dev/tty", "-echo").Run()
-}
-
-// disableRawMode disables raw mode
-func disableRawMode() {
-	exec.Command("stty", "-f", "/dev/tty", "-cbreak").Run()
-	exec.Command("stty", "-f", "/dev/tty", "echo").Run()
 }
 
 func RunGame(mapFile string) error {
