@@ -6,15 +6,16 @@ import (
 )
 
 func TestLoadMapsFromFile(t *testing.T) {
-	// Create a temporary test map file
+	// Create a temporary test map file with same-sized maps
 	content := `OOOOOO
 O----O
 O----O
 OOOOOO
 ---
-OOOO
-O--O
-OOOO
+OOOOOO
+O----O
+O----O
+OOOOOO
 `
 	tmpFile, err := os.CreateTemp("", "test_map_*.txt")
 	if err != nil {
@@ -46,12 +47,41 @@ OOOO
 		t.Errorf("Expected width 6 for first map, got %d", maps[0].Width)
 	}
 	
-	// Check second map dimensions
-	if maps[1].Height != 3 {
-		t.Errorf("Expected height 3 for second map, got %d", maps[1].Height)
+	// Check second map dimensions (should be same as first)
+	if maps[1].Height != 4 {
+		t.Errorf("Expected height 4 for second map, got %d", maps[1].Height)
 	}
-	if maps[1].Width != 4 {
-		t.Errorf("Expected width 4 for second map, got %d", maps[1].Width)
+	if maps[1].Width != 6 {
+		t.Errorf("Expected width 6 for second map, got %d", maps[1].Width)
+	}
+}
+
+func TestLoadMapsWithDifferentSizes(t *testing.T) {
+	// Test that loading maps with different sizes returns an error
+	content := `OOOOOO
+O----O
+O----O
+OOOOOO
+---
+OOOO
+O--O
+OOOO
+`
+	tmpFile, err := os.CreateTemp("", "test_map_*.txt")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	
+	if _, err := tmpFile.WriteString(content); err != nil {
+		t.Fatalf("Failed to write to temp file: %v", err)
+	}
+	tmpFile.Close()
+	
+	// Load maps - should fail
+	_, err = LoadMapsFromFile(tmpFile.Name())
+	if err == nil {
+		t.Error("Expected error when loading maps with different sizes, got nil")
 	}
 }
 

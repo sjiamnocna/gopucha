@@ -59,6 +59,18 @@ func LoadMapsFromFile(filename string) ([]Map, error) {
 		return nil, err
 	}
 	
+	// Validate that all maps have the same dimensions
+	if len(maps) > 1 {
+		firstWidth := maps[0].Width
+		firstHeight := maps[0].Height
+		for i, m := range maps[1:] {
+			if m.Width != firstWidth || m.Height != firstHeight {
+				return nil, fmt.Errorf("map %d has different dimensions (%dx%d) than first map (%dx%d). All maps in a file must have the same dimensions", 
+					i+2, m.Width, m.Height, firstWidth, firstHeight)
+			}
+		}
+	}
+	
 	return maps, nil
 }
 
