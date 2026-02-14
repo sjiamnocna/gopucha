@@ -26,64 +26,6 @@ import (
 	"github.com/sjiamnocna/gopucha/internal/maps"
 )
 
-const (
-	defaultBlockSize          = 20
-	minBlockSize              = 10
-	maxBlockSize              = 50
-	minWindowSize             = 640
-	statusBarHeight           = 80
-	defaultTickInterval       = 220 * time.Millisecond
-	monsterTeethBlinkInterval = 150 * time.Millisecond
-)
-
-type GameState int
-
-const (
-	StateSettings GameState = iota
-	StateLevelStart
-	StatePlaying
-	StateLevelComplete
-	StateGameOver
-	StateWon
-)
-
-type GUIGame struct {
-	app                   fyne.App
-	window                fyne.Window
-	game                  *gameplay.Game
-	blockSize             float32
-	offsetX               float32 // X offset for centering the game
-	offsetY               float32 // Y offset for centering the game
-	canvas                *fyne.Container
-	keyCatcher            *keyCatcher
-	ticker                *time.Ticker
-	tickInterval          time.Duration
-	mapFile               string
-	infoLabel             *widget.Label
-	controlsLabel         *widget.Label
-	state                 GameState
-	countdownTicks        int
-	pauseTicks            int
-	tickerDone            chan bool
-	mouthOpen             bool
-	mouthOpenRatio        float64
-	mouthAnimDir          int
-	mouthTicker           *time.Ticker
-	disableMonsters       bool
-	monsterTeethBlink     bool
-	monsterTeethBlinkLast time.Time
-}
-
-type renderPos struct {
-	x float32
-	y float32
-}
-
-type keyCatcher struct {
-	widget.BaseWidget
-	onKey func(*fyne.KeyEvent)
-}
-
 func newKeyCatcher(onKey func(*fyne.KeyEvent)) *keyCatcher {
 	k := &keyCatcher{onKey: onKey}
 	k.ExtendBaseWidget(k)
@@ -316,7 +258,7 @@ func (g *GUIGame) startGame() {
 	}
 
 	g.state = StateLevelStart
-	g.countdownTicks = 5
+	g.countdownStart = time.Now()
 	g.pauseTicks = 0
 	g.mouthOpen = false
 	g.mouthOpenRatio = 0
@@ -545,7 +487,7 @@ func (g *GUIGame) updateControlsVisibility() {
 	}
 
 	// Only show controls during countdown/level start
-	if g.state == StateLevelStart && g.countdownTicks > 0 {
+	if g.state == StateLevelStart && time.Since(g.countdownStart) < 3*time.Second {
 		g.controlsLabel.SetText("Controls: Arrow Keys to move | F2 restart | +/- zoom | ESC settings")
 	} else {
 		g.controlsLabel.SetText("")
@@ -949,8 +891,10 @@ func (g *GUIGame) renderGameWithCountdown(infoLabel *widget.Label) {
 	g.renderGame(infoLabel)
 
 	// Add countdown display in center
-	if g.countdownTicks >= 0 {
-		countdownText := canvas.NewText(fmt.Sprintf("%d", g.countdownTicks), color.RGBA{255, 255, 255, 255})
+	elapsed := time.Since(g.countdownStart).Seconds()
+	if elapsed < 3 {
+		remaining := int(3 - elapsed)
+		countdownText := canvas.NewText(fmt.Sprintf("%d", remaining), color.RGBA{255, 255, 255, 255})
 		countdownText.TextSize = 48
 		countdownText.Alignment = fyne.TextAlignCenter
 
@@ -1149,8 +1093,7 @@ func (g *GUIGame) startGameLoop() {
 
 			// Handle level start countdown phase
 			if g.state == StateLevelStart {
-				if g.countdownTicks > 0 {
-					g.countdownTicks--
+				if time.Since(g.countdownStart) < 3*time.Second {
 					fyne.DoAndWait(func() {
 						g.renderGameWithCountdown(g.infoLabel)
 					})
@@ -1173,7 +1116,7 @@ func (g *GUIGame) startGameLoop() {
 				// Pause finished, move to next level
 				g.game.LoadLevel(g.game.CurrentLevel + 1)
 				g.state = StateLevelStart
-				g.countdownTicks = 5
+				g.countdownStart = time.Now()
 				g.pauseTicks = 0
 				continue
 			}
@@ -1207,9 +1150,7 @@ func (g *GUIGame) startGameLoop() {
 
 			// Restart countdown if a life was lost
 			if lifeLost {
-				g.countdownTicks = 5
-				g.game.LifeLost = false
-				g.state = StateLevelStart
+				g.countdownStart = time.Now()
 			}
 
 			// Check if level is completed

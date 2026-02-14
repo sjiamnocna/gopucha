@@ -1,28 +1,8 @@
 package actors
 
 import (
-	"sync"
-
 	"github.com/sjiamnocna/gopucha/internal/maps"
 )
-
-type Direction int
-
-const (
-	Up Direction = iota
-	Down
-	Left
-	Right
-)
-
-type Player struct {
-	X         int
-	Y         int
-	Direction Direction
-	Desired   Direction
-	Queue     []Direction
-	mu        sync.Mutex // Protects Direction, Desired, and Queue
-}
 
 func NewPlayer(x, y int) *Player {
 	return &Player{

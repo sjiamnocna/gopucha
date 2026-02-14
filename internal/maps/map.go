@@ -8,37 +8,6 @@ import (
 	"strings"
 )
 
-type Cell int
-
-const (
-	Empty Cell = iota
-	Wall
-	Dot
-)
-
-type Map struct {
-	Width         int
-	Height        int
-	Cells         [][]Cell
-	Name          string
-	Material      string
-	MonsterCount  int
-	SpeedModifier float64
-	PlayerStart   *StartPos
-	MonsterStarts []StartPos
-}
-
-type StartPos struct {
-	X int
-	Y int
-}
-
-// Creature represents anything with X, Y coordinates (used for rendering)
-type Creature interface {
-	GetX() int
-	GetY() int
-}
-
 func LoadMapsFromFile(filename string) ([]Map, error) {
 	file, err := os.Open(filename)
 	if err != nil {

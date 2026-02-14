@@ -2,12 +2,6 @@ package actors
 
 import "github.com/sjiamnocna/gopucha/internal/maps"
 
-type Monster struct {
-	X         int
-	Y         int
-	Direction Direction
-}
-
 func NewMonster(x, y int, dir Direction) *Monster {
 	return &Monster{
 		X:         x,
