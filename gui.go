@@ -25,6 +25,15 @@ const (
 	maxBlockSize     = 50
 )
 
+type GameState int
+
+const (
+	StateSettings GameState = iota
+	StatePlaying
+	StateGameOver
+	StateWon
+)
+
 type GUIGame struct {
 	app          fyne.App
 	window       fyne.Window
@@ -34,10 +43,11 @@ type GUIGame struct {
 	keyCatcher   *keyCatcher
 	ticker       *time.Ticker
 	tickInterval time.Duration
-	gameStarted  bool
 	mapFile      string
 	infoLabel    *widget.Label
-	gameOverFlag bool
+	state        GameState
+	countdownTicks int
+	tickerDone    chan bool
 }
 
 type keyCatcher struct {
@@ -72,26 +82,32 @@ func RunGUIGame(mapFile string) error {
 	guiGame := &GUIGame{
 		app:          app.New(),
 		blockSize:    defaultBlockSize,
-		tickInterval: 200 * time.Millisecond,
+		tickInterval: 260 * time.Millisecond,
 		mapFile:      mapFile,
+		state:        StateSettings,
 	}
 
 	guiGame.window = guiGame.app.NewWindow("Gopucha - Pac-Man Game")
 	guiGame.window.Resize(fyne.NewSize(800, 600))
 	guiGame.window.SetMaster()
 
-	// Show settings dialog before starting
-	guiGame.showSettings()
+	// Start game immediately (settings available via ESC)
+	guiGame.startGame()
 
 	guiGame.window.ShowAndRun()
 	return nil
 }
 
 func (g *GUIGame) showSettings() {
+	// Stop game loop while settings are open
+	if g.ticker != nil {
+		g.ticker.Stop()
+	}
+
 	// Speed slider
 	speedLabel := widget.NewLabel("Game Speed:")
 	speedValue := binding.NewFloat()
-	speedValue.Set(200)
+	speedValue.Set(float64(g.tickInterval.Milliseconds()))
 
 	speedSlider := widget.NewSliderWithData(50, 500, speedValue)
 	speedSlider.Step = 50
@@ -101,24 +117,15 @@ func (g *GUIGame) showSettings() {
 	// Map file selection
 	mapFiles := g.findMapFiles()
 	mapLabel := widget.NewLabel("Select Map:")
-	mapSelect := widget.NewSelect(mapFiles, func(selected string) {
-		if selected != "" {
-			g.mapFile = selected
-		}
-	})
-	if len(mapFiles) > 0 {
+	mapSelect := widget.NewSelect(mapFiles, func(selected string) {})
+	if g.mapFile != "" {
+		mapSelect.SetSelected(g.mapFile)
+	} else if len(mapFiles) > 0 {
 		mapSelect.SetSelected(mapFiles[0])
 	}
 
-	// Start button
-	startButton := widget.NewButton("Start Game", func() {
-		speed, _ := speedValue.Get()
-		g.tickInterval = time.Duration(speed) * time.Millisecond
-		g.startGame()
-	})
-
 	content := container.NewVBox(
-		widget.NewLabel("Game Settings"),
+		widget.NewLabel("Settings"),
 		widget.NewSeparator(),
 		speedLabel,
 		speedSlider,
@@ -126,11 +133,33 @@ func (g *GUIGame) showSettings() {
 		widget.NewSeparator(),
 		mapLabel,
 		mapSelect,
-		widget.NewSeparator(),
-		startButton,
 	)
 
-	g.window.SetContent(content)
+	dialog.ShowCustomConfirm("Settings", "Apply", "Cancel", content, func(apply bool) {
+		if apply {
+			speed, _ := speedValue.Get()
+			g.tickInterval = time.Duration(speed) * time.Millisecond
+			if selected := mapSelect.Selected; selected != "" {
+				g.mapFile = selected
+			}
+			g.startGame()
+			g.initControls()
+			return
+		}
+
+		// If cancelled and game is over or not started, restart fresh
+		if g.state == StateGameOver || g.state == StateSettings {
+			g.startGame()
+			g.initControls()
+			return
+		}
+
+		// If cancelled and game was running, resume it
+		if g.state == StatePlaying && g.game != nil {
+			g.startGameLoop()
+			g.initControls()
+		}
+	}, g.window)
 }
 
 func (g *GUIGame) findMapFiles() []string {
@@ -171,6 +200,25 @@ func (g *GUIGame) findMapFiles() []string {
 }
 
 func (g *GUIGame) startGame() {
+	// Stop and wait for previous ticker to finish
+	if g.ticker != nil {
+		g.ticker.Stop()
+		// Wait for ticker goroutine to finish
+		if g.tickerDone != nil {
+			select {
+			case <-g.tickerDone:
+			case <-time.After(100 * time.Millisecond):
+			}
+		}
+	}
+
+	if g.mapFile == "" {
+		mapFiles := g.findMapFiles()
+		if len(mapFiles) > 0 {
+			g.mapFile = mapFiles[0]
+		}
+	}
+
 	// Load maps
 	maps, err := LoadMapsFromFile(g.mapFile)
 	if err != nil {
@@ -189,9 +237,11 @@ func (g *GUIGame) startGame() {
 		return
 	}
 
-	g.gameStarted = true
+	g.state = StatePlaying
+	g.countdownTicks = 5
 	g.setupGameUI()
 	g.startGameLoop()
+	g.initControls()
 }
 
 func (g *GUIGame) setupGameUI() {
@@ -199,10 +249,10 @@ func (g *GUIGame) setupGameUI() {
 	g.canvas = container.NewWithoutLayout()
 
 	// Info panel
-	g.infoLabel = widget.NewLabel(fmt.Sprintf("Level: %d | Score: %d | Dots: %d",
-		g.game.CurrentLevel+1, g.game.Score, g.game.CurrentMap.CountDots()))
+	g.infoLabel = widget.NewLabel(fmt.Sprintf("Level: %d | Score: %d | Lives: %d | Dots: %d",
+		g.game.CurrentLevel+1, g.game.Score, g.game.Lives, g.game.CurrentMap.CountDots()))
 
-	controls := widget.NewLabel("Controls: Arrow Keys to move | +/- to zoom | N for new game | ESC to quit")
+	controls := widget.NewLabel("Controls: Arrow Keys to move | +/- to zoom | ESC for settings")
 
 	topBar := container.NewVBox(g.infoLabel, controls)
 
@@ -210,9 +260,7 @@ func (g *GUIGame) setupGameUI() {
 	scroll := container.NewScroll(g.canvas)
 
 	// Key capture overlay to ensure arrow keys are received reliably
-	g.keyCatcher = newKeyCatcher(func(ev *fyne.KeyEvent) {
-		g.handleKeyPress(ev, g.infoLabel)
-	})
+	g.initControls()
 	gameArea := container.NewStack(scroll, g.keyCatcher)
 
 	content := container.NewBorder(topBar, nil, nil, nil, gameArea)
@@ -226,9 +274,19 @@ func (g *GUIGame) setupGameUI() {
 	// Note: Fyne doesn't directly support scroll events, so we'll rely on keyboard shortcuts
 
 	// Render initial state
-	g.gameOverFlag = false
 	g.renderGame(g.infoLabel)
 	g.calculateBlockSize()
+}
+
+func (g *GUIGame) initControls() {
+	if g.keyCatcher == nil {
+		g.keyCatcher = newKeyCatcher(func(ev *fyne.KeyEvent) {
+			g.handleKeyPress(ev, g.infoLabel)
+		})
+	}
+	if g.window != nil && g.window.Canvas() != nil {
+		g.window.Canvas().Focus(g.keyCatcher)
+	}
 }
 
 func (g *GUIGame) renderGame(infoLabel *widget.Label) {
@@ -282,10 +340,30 @@ func (g *GUIGame) renderGame(infoLabel *widget.Label) {
 	g.canvas.Add(circle)
 
 	// Update info
-	infoLabel.SetText(fmt.Sprintf("Level: %d | Score: %d | Dots: %d | MapSize: %dx%d",
-		g.game.CurrentLevel+1, g.game.Score, g.game.CurrentMap.CountDots(), m.Width, m.Height))
+	infoLabel.SetText(fmt.Sprintf("Level: %d | Score: %d | Lives: %d | Dots: %d | MapSize: %dx%d",
+		g.game.CurrentLevel+1, g.game.Score, g.game.Lives, g.game.CurrentMap.CountDots(), m.Width, m.Height))
 
 	g.canvas.Refresh()
+}
+
+func (g *GUIGame) renderGameWithCountdown(infoLabel *widget.Label) {
+	// Render the same as normal game
+	g.renderGame(infoLabel)
+
+	// Add countdown display in center
+	if g.countdownTicks >= 0 {
+		countdownText := canvas.NewText(fmt.Sprintf("%d", g.countdownTicks), color.RGBA{255, 255, 255, 255})
+		countdownText.TextSize = 48
+		countdownText.Alignment = fyne.TextAlignCenter
+
+		m := g.game.CurrentMap
+		centerX := float32(m.Width) * g.blockSize / 2
+		centerY := float32(m.Height) * g.blockSize / 2
+
+		countdownText.Move(fyne.NewPos(centerX-40, centerY-40))
+		g.canvas.Add(countdownText)
+		g.canvas.Refresh()
+	}
 }
 
 func (g *GUIGame) calculateBlockSize() {
@@ -319,32 +397,25 @@ func (g *GUIGame) calculateBlockSize() {
 }
 
 func (g *GUIGame) handleKeyPress(ev *fyne.KeyEvent, infoLabel *widget.Label) {
-	// Handle N for new game
-	if ev.Name == fyne.KeyN {
-		if g.ticker != nil {
-			g.ticker.Stop()
-		}
-		g.gameStarted = false
-		g.gameOverFlag = false
-		g.showSettings()
-		return
-	}
-
-	// Handle arrow keys after game over to restart
-	if g.gameOverFlag {
+	// Handle arrow keys and space after game over to restart
+	if g.state == StateGameOver || g.state == StateWon {
 		switch ev.Name {
-		case fyne.KeyUp, fyne.KeyDown, fyne.KeyLeft, fyne.KeyRight:
+		case fyne.KeyUp, fyne.KeyDown, fyne.KeyLeft, fyne.KeyRight, fyne.KeySpace:
 			if g.ticker != nil {
 				g.ticker.Stop()
 			}
-			g.gameStarted = false
-			g.gameOverFlag = false
-			g.showSettings()
+			g.state = StatePlaying
+			g.startGame()
 			return
 		}
 	}
 
-	if !g.gameStarted || g.game == nil {
+	if g.state != StatePlaying || g.game == nil {
+		return
+	}
+
+	// Ignore movement input during countdown
+	if g.countdownTicks > 0 {
 		return
 	}
 
@@ -358,7 +429,7 @@ func (g *GUIGame) handleKeyPress(ev *fyne.KeyEvent, infoLabel *widget.Label) {
 	case fyne.KeyRight:
 		g.game.Player.SetDirection(Right)
 	case fyne.KeyEscape:
-		g.app.Quit()
+		g.showSettings()
 	case fyne.KeyEqual, fyne.KeyPlus:
 		// + to zoom in
 		g.zoomIn(infoLabel)
@@ -383,26 +454,43 @@ func (g *GUIGame) zoomOut(infoLabel *widget.Label) {
 }
 
 func (g *GUIGame) startGameLoop() {
+	g.tickerDone = make(chan bool)
 	g.ticker = time.NewTicker(g.tickInterval)
 
 	go func() {
+		defer func() {
+			g.tickerDone <- true
+		}()
+
 		for range g.ticker.C {
-			if g.game.GameOver || g.game.Won {
+			// Handle countdown phase
+			if g.countdownTicks > 0 {
+				g.countdownTicks--
+				g.renderGameWithCountdown(g.infoLabel)
+				continue
+			}
+
+			if g.game.GameOver {
 				g.ticker.Stop()
-				g.gameOverFlag = true
+				g.state = StateGameOver
+				return
+			}
 
-				var msg string
-				if g.game.GameOver {
-					msg = "Game Over! Press any arrow key to play again."
-				} else {
-					msg = fmt.Sprintf("You Won! Final Score: %d. Press any arrow key to play again.", g.game.Score)
-				}
-
-				dialog.ShowInformation("Game Ended", msg, g.window)
+			if g.game.Won {
+				g.ticker.Stop()
+				g.state = StateWon
+				dialog.ShowInformation("You Won!", fmt.Sprintf("Final Score: %d", g.game.Score), g.window)
 				return
 			}
 
 			g.game.Update()
+
+			// Auto-advance to next level when all dots eaten
+			if g.game.CurrentMap.CountDots() == 0 {
+				g.game.loadLevel(g.game.CurrentLevel + 1)
+				g.countdownTicks = 5
+			}
+
 			g.renderGame(g.infoLabel)
 		}
 	}()

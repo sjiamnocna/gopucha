@@ -1,8 +1,6 @@
 package gopucha
 
-import (
-	"math/rand"
-)
+
 
 type Monster struct {
 	X         int
@@ -18,106 +16,68 @@ func NewMonster(x, y int, dir Direction) *Monster {
 	}
 }
 
-func (mo *Monster) Move(m *Map) {
-	// Try to move in current direction
+func (mo *Monster) Move(m *Map, playerX, playerY int, monsters []Monster) {
 	newX, newY := mo.X, mo.Y
-	
-	switch mo.Direction {
-	case Up:
-		newY--
-	case Down:
-		newY++
-	case Left:
-		newX--
-	case Right:
-		newX++
-	}
-	
-	// If can't move forward or at an edge, try to turn
-	if m.IsWall(newX, newY) || mo.shouldTurn(m) {
-		mo.turn(m)
-		// Try to move in new direction
+	dx, dy := directionDelta(mo.Direction)
+	newX += dx
+	newY += dy
+
+	// Only turn when next cell is a wall or another monster
+	if m.IsWall(newX, newY) || isOccupiedByMonster(newX, newY, monsters, mo) {
+		mo.Direction = mo.chooseDirection(m, playerX, playerY, monsters)
 		newX, newY = mo.X, mo.Y
-		switch mo.Direction {
-		case Up:
-			newY--
-		case Down:
-			newY++
-		case Left:
-			newX--
-		case Right:
-			newX++
-		}
+		dx, dy = directionDelta(mo.Direction)
+		newX += dx
+		newY += dy
 	}
-	
-	if !m.IsWall(newX, newY) {
+
+	if !m.IsWall(newX, newY) && !isOccupiedByMonster(newX, newY, monsters, mo) {
 		mo.X = newX
 		mo.Y = newY
 	}
 }
 
-func (mo *Monster) shouldTurn(m *Map) bool {
-	// Check if at an intersection (can turn)
-	canTurnLeft := false
-	canTurnRight := false
-	
-	switch mo.Direction {
-	case Up, Down:
-		canTurnLeft = !m.IsWall(mo.X-1, mo.Y)
-		canTurnRight = !m.IsWall(mo.X+1, mo.Y)
-	case Left, Right:
-		canTurnLeft = !m.IsWall(mo.X, mo.Y-1)
-		canTurnRight = !m.IsWall(mo.X, mo.Y+1)
+func (mo *Monster) chooseDirection(m *Map, playerX, playerY int, monsters []Monster) Direction {
+	bestDir := mo.Direction
+	bestDist := -1
+
+	for _, d := range []Direction{Up, Down, Left, Right} {
+		dx, dy := directionDelta(d)
+		nx, ny := mo.X+dx, mo.Y+dy
+		if m.IsWall(nx, ny) || isOccupiedByMonster(nx, ny, monsters, mo) {
+			continue
+		}
+		dist := manhattan(nx, ny, playerX, playerY)
+		if bestDist == -1 || dist < bestDist {
+			bestDist = dist
+			bestDir = d
+		}
 	}
-	
-	// 30% chance to turn at an intersection
-	if (canTurnLeft || canTurnRight) && rand.Float32() < 0.3 {
-		return true
+
+	return bestDir
+}
+
+func isOccupiedByMonster(x, y int, monsters []Monster, self *Monster) bool {
+	for i := range monsters {
+		m := &monsters[i]
+		if m == self {
+			continue
+		}
+		if m.X == x && m.Y == y {
+			return true
+		}
 	}
-	
 	return false
 }
 
-func (mo *Monster) turn(m *Map) {
-	// Get available directions
-	directions := []Direction{}
-	
-	// Check all four directions
-	if !m.IsWall(mo.X, mo.Y-1) {
-		directions = append(directions, Up)
+func manhattan(x1, y1, x2, y2 int) int {
+	dx := x1 - x2
+	if dx < 0 {
+		dx = -dx
 	}
-	if !m.IsWall(mo.X, mo.Y+1) {
-		directions = append(directions, Down)
+	dy := y1 - y2
+	if dy < 0 {
+		dy = -dy
 	}
-	if !m.IsWall(mo.X-1, mo.Y) {
-		directions = append(directions, Left)
-	}
-	if !m.IsWall(mo.X+1, mo.Y) {
-		directions = append(directions, Right)
-	}
-	
-	// Don't go backwards if other options exist
-	var backward Direction
-	switch mo.Direction {
-	case Up:
-		backward = Down
-	case Down:
-		backward = Up
-	case Left:
-		backward = Right
-	case Right:
-		backward = Left
-	}
-	
-	// Filter out backwards direction if there are other options
-	filteredDirs := []Direction{}
-	for _, d := range directions {
-		if d != backward || len(directions) == 1 {
-			filteredDirs = append(filteredDirs, d)
-		}
-	}
-	
-	if len(filteredDirs) > 0 {
-		mo.Direction = filteredDirs[rand.Intn(len(filteredDirs))]
-	}
+	return dx + dy
 }

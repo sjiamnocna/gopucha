@@ -14,6 +14,7 @@ type Game struct {
 	GameOver     bool
 	Won          bool
 	Score        int
+	Lives        int
 }
 
 func NewGame(maps []Map) *Game {
@@ -25,6 +26,7 @@ func NewGame(maps []Map) *Game {
 		Maps:         maps,
 		CurrentLevel: 0,
 		Score:        0,
+		Lives:        3,
 	}
 	
 	g.loadLevel(0)
@@ -52,7 +54,26 @@ func (g *Game) loadLevel(level int) {
 	}
 PlayerPlaced:
 	
-	// Place 4 monsters
+	// Calculate number of monsters based on available space
+	availableSpaces := 0
+	for y := 0; y < g.CurrentMap.Height; y++ {
+		for x := 0; x < g.CurrentMap.Width; x++ {
+			if !g.CurrentMap.IsWall(x, y) {
+				availableSpaces++
+			}
+		}
+	}
+	
+	// 1 monster per 5-10 available spaces, min 1, max 4
+	numMonsters := availableSpaces / 7
+	if numMonsters < 1 {
+		numMonsters = 1
+	}
+	if numMonsters > 4 {
+		numMonsters = 4
+	}
+	
+	// Place monsters
 	g.Monsters = []Monster{}
 	monsterPositions := [][2]int{
 		{g.CurrentMap.Width - 2, 1},
@@ -61,7 +82,8 @@ PlayerPlaced:
 		{g.CurrentMap.Width / 2, g.CurrentMap.Height / 2},
 	}
 	
-	for i, pos := range monsterPositions {
+	for i := 0; i < numMonsters && i < len(monsterPositions); i++ {
+		pos := monsterPositions[i]
 		x, y := pos[0], pos[1]
 		if x >= g.CurrentMap.Width {
 			x = g.CurrentMap.Width - 1
@@ -105,13 +127,28 @@ func (g *Game) Update() {
 	
 	// Move monsters
 	for i := range g.Monsters {
-		g.Monsters[i].Move(g.CurrentMap)
+		g.Monsters[i].Move(g.CurrentMap, g.Player.X, g.Player.Y, g.Monsters)
 	}
 	
 	// Check collision with monsters
 	for _, monster := range g.Monsters {
 		if g.Player.X == monster.X && g.Player.Y == monster.Y {
-			g.GameOver = true
+			g.Lives--
+			if g.Lives <= 0 {
+				g.GameOver = true
+			} else {
+				// Reset player position on this level
+				g.Player = NewPlayer(1, 1)
+				for y := 0; y < g.CurrentMap.Height; y++ {
+					for x := 0; x < g.CurrentMap.Width; x++ {
+						if !g.CurrentMap.IsWall(x, y) {
+							g.Player = NewPlayer(x, y)
+							goto PlayerReset
+						}
+					}
+				}
+			PlayerReset:
+			}
 			return
 		}
 	}
