@@ -1,7 +1,9 @@
-package gopucha
+package gameplay
 
 import (
 	"testing"
+
+	"github.com/sjiamnocna/gopucha/internal/maps"
 )
 
 func TestGameSpeedModifierScoring(t *testing.T) {
@@ -60,7 +62,7 @@ func TestGameSpeedModifierScoring(t *testing.T) {
 			}
 
 			// Create game with this map
-			game := NewGame([]Map{m}, false)
+			game := NewGame([]maps.Map{m}, false)
 			if game == nil {
 				t.Fatalf("Failed to create game")
 			}
@@ -79,18 +81,18 @@ func TestGameSpeedModifierScoring(t *testing.T) {
 }
 
 func TestGameLoadLevelSetsSpeedModifier(t *testing.T) {
-	maps := []Map{
+	mapsList := []maps.Map{
 		{
 			Width:         5,
 			Height:        5,
 			Name:          "Slow Map",
 			SpeedModifier: 0.5,
-			Cells: [][]Cell{
-				{Wall, Wall, Wall, Wall, Wall},
-				{Wall, Empty, Dot, Empty, Wall},
-				{Wall, Dot, Empty, Dot, Wall},
-				{Wall, Empty, Dot, Empty, Wall},
-				{Wall, Wall, Wall, Wall, Wall},
+			Cells: [][]maps.Cell{
+				{maps.Wall, maps.Wall, maps.Wall, maps.Wall, maps.Wall},
+				{maps.Wall, maps.Empty, maps.Dot, maps.Empty, maps.Wall},
+				{maps.Wall, maps.Dot, maps.Empty, maps.Dot, maps.Wall},
+				{maps.Wall, maps.Empty, maps.Dot, maps.Empty, maps.Wall},
+				{maps.Wall, maps.Wall, maps.Wall, maps.Wall, maps.Wall},
 			},
 		},
 		{
@@ -98,17 +100,17 @@ func TestGameLoadLevelSetsSpeedModifier(t *testing.T) {
 			Height:        5,
 			Name:          "Fast Map",
 			SpeedModifier: 2.0,
-			Cells: [][]Cell{
-				{Wall, Wall, Wall, Wall, Wall},
-				{Wall, Empty, Dot, Empty, Wall},
-				{Wall, Dot, Empty, Dot, Wall},
-				{Wall, Empty, Dot, Empty, Wall},
-				{Wall, Wall, Wall, Wall, Wall},
+			Cells: [][]maps.Cell{
+				{maps.Wall, maps.Wall, maps.Wall, maps.Wall, maps.Wall},
+				{maps.Wall, maps.Empty, maps.Dot, maps.Empty, maps.Wall},
+				{maps.Wall, maps.Dot, maps.Empty, maps.Dot, maps.Wall},
+				{maps.Wall, maps.Empty, maps.Dot, maps.Empty, maps.Wall},
+				{maps.Wall, maps.Wall, maps.Wall, maps.Wall, maps.Wall},
 			},
 		},
 	}
 
-	game := NewGame(maps, true)
+	game := NewGame(mapsList, true)
 	if game == nil {
 		t.Fatalf("Failed to create game")
 	}
@@ -119,7 +121,7 @@ func TestGameLoadLevelSetsSpeedModifier(t *testing.T) {
 	}
 
 	// Load second level
-	game.loadLevel(1)
+	game.LoadLevel(1)
 	if game.CurrentSpeedModifier != 2.0 {
 		t.Errorf("Level 1: CurrentSpeedModifier = %v, want 2.0", game.CurrentSpeedModifier)
 	}
@@ -141,7 +143,7 @@ func TestDotScoringWithSpeedModifier(t *testing.T) {
 		t.Fatalf("Failed to parse map: %v", err)
 	}
 
-	game := NewGame([]Map{m}, true) // disable monsters for simpler test
+	game := NewGame([]maps.Map{m}, true) // disable monsters for simpler test
 	if game == nil {
 		t.Fatalf("Failed to create game")
 	}

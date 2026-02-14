@@ -1,4 +1,4 @@
-package gopucha
+package maps
 
 import (
 	"os"

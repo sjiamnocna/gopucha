@@ -1,17 +1,20 @@
-# gopucha
+# Gopucha
 
 Golang Zoner Pampuch reimplemented to Golang with custom maps.
 
 ## Description
 
-Gopucha is based on the Czech original Pampuch, where a semi-circle figure moves around eating dots while avoiding monsters (red squares). The game supports custom maps loaded from text files and runs in GUI mode.
+`Ropucha` is Czech word for `toad`, and `Pampuch` is an **old Czech game** similar to `Pacman` but **more complex** in monster movement logic. Therefore the project is named `Gopucha` as a playful combination of `Go`, `Pampuch` and `Ropucha`.
+
+The player **controls a figure** (`Pampuch`) that must eat dots while avoiding monsters.
+
+The monsters **can only change direction when they crash to walls or themselves** and then choose the direction according to the shortest available path toward the `Pampuch` figure, making them more `thinking` challenge than traditional `Pacman` ghosts.
 
 ## Features
 
 - **GUI Mode**: Fyne-based interface
-- **Custom Map Loading**: Load maps from TXT files
+- **Custom Map Loading**: Load maps from TXT map files
 - **Map Generator**: Generate random coherent maps
-- **Multiple Levels**: Separated by `---` in map files (all maps must have same dimensions)
 - **GUI Features**:
   - Pre-game settings: adjust speed, select map
   - Arrow key controls

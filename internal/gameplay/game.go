@@ -1,17 +1,20 @@
-package gopucha
+package gameplay
 
 import (
 	"fmt"
 	"math/rand"
 	"time"
+
+	"github.com/sjiamnocna/gopucha/internal/actors"
+	"github.com/sjiamnocna/gopucha/internal/maps"
 )
 
 type Game struct {
-	CurrentMap           *Map
-	Maps                 []Map
+	CurrentMap           *maps.Map
+	Maps                 []maps.Map
 	CurrentLevel         int
-	Player               *Player
-	Monsters             []Monster
+	Player               *actors.Player
+	Monsters             []actors.Monster
 	GameOver             bool
 	Won                  bool
 	Score                int
@@ -25,24 +28,24 @@ type Game struct {
 
 const defaultMinMonsterDistance = 5
 
-func NewGame(maps []Map, disableMonsters bool) *Game {
-	if len(maps) == 0 {
+func NewGame(mapsList []maps.Map, disableMonsters bool) *Game {
+	if len(mapsList) == 0 {
 		return nil
 	}
 
 	g := &Game{
-		Maps:            maps,
+		Maps:            mapsList,
 		CurrentLevel:    0,
 		Score:           0,
 		Lives:           3,
 		DisableMonsters: disableMonsters,
 	}
 
-	g.loadLevel(0)
+	g.LoadLevel(0)
 	return g
 }
 
-func (g *Game) loadLevel(level int) {
+func (g *Game) LoadLevel(level int) {
 	if level >= len(g.Maps) {
 		g.Won = true
 		return
@@ -61,18 +64,18 @@ func (g *Game) loadLevel(level int) {
 func (g *Game) placePlayer() {
 	// Reset player to starting position with cleared input queue
 	if g.CurrentMap.PlayerStart != nil {
-		g.Player = NewPlayer(g.CurrentMap.PlayerStart.X, g.CurrentMap.PlayerStart.Y)
+		g.Player = actors.NewPlayer(g.CurrentMap.PlayerStart.X, g.CurrentMap.PlayerStart.Y)
 		return
 	}
 
 	pos, ok := g.randomWalkable(nil)
 	if ok {
-		g.Player = NewPlayer(pos.X, pos.Y)
+		g.Player = actors.NewPlayer(pos.X, pos.Y)
 		return
 	}
 
 	// Fallback
-	g.Player = NewPlayer(1, 1)
+	g.Player = actors.NewPlayer(1, 1)
 }
 
 func (g *Game) placeMonsters() {
@@ -91,7 +94,7 @@ func (g *Game) placeMonsters() {
 	}
 
 	// Place monsters
-	g.Monsters = []Monster{}
+	g.Monsters = []actors.Monster{}
 	used := make(map[string]bool)
 	used[fmt.Sprintf("%d,%d", g.Player.X, g.Player.Y)] = true
 	distMap := distanceMapFrom(g.CurrentMap, g.Player.X, g.Player.Y)
@@ -128,13 +131,13 @@ func (g *Game) placeMonsters() {
 			continue // Skip this monster if no valid position found
 		}
 
-		dir := Direction(i % 4)
-		g.Monsters = append(g.Monsters, *NewMonster(x, y, dir))
+		dir := actors.Direction(i % 4)
+		g.Monsters = append(g.Monsters, *actors.NewMonster(x, y, dir))
 	}
 }
 
-func (g *Game) randomWalkableWithMinDistance(exclude map[string]bool, distMap [][]int, minDist int) (StartPos, bool) {
-	positions := make([]StartPos, 0)
+func (g *Game) randomWalkableWithMinDistance(exclude map[string]bool, distMap [][]int, minDist int) (maps.StartPos, bool) {
+	positions := make([]maps.StartPos, 0)
 	for y := 0; y < g.CurrentMap.Height; y++ {
 		for x := 0; x < g.CurrentMap.Width; x++ {
 			if g.CurrentMap.IsWall(x, y) {
@@ -147,19 +150,19 @@ func (g *Game) randomWalkableWithMinDistance(exclude map[string]bool, distMap []
 			if exclude != nil && exclude[key] {
 				continue
 			}
-			positions = append(positions, StartPos{X: x, Y: y})
+			positions = append(positions, maps.StartPos{X: x, Y: y})
 		}
 	}
 
 	if len(positions) == 0 {
-		return StartPos{}, false
+		return maps.StartPos{}, false
 	}
 
 	idx := rand.Intn(len(positions))
 	return positions[idx], true
 }
 
-func distanceMapFrom(m *Map, startX, startY int) [][]int {
+func distanceMapFrom(m *maps.Map, startX, startY int) [][]int {
 	dist := make([][]int, m.Height)
 	for y := 0; y < m.Height; y++ {
 		dist[y] = make([]int, m.Width)
@@ -203,8 +206,8 @@ func distanceMapFrom(m *Map, startX, startY int) [][]int {
 	return dist
 }
 
-func (g *Game) randomWalkable(exclude map[string]bool) (StartPos, bool) {
-	positions := make([]StartPos, 0)
+func (g *Game) randomWalkable(exclude map[string]bool) (maps.StartPos, bool) {
+	positions := make([]maps.StartPos, 0)
 	for y := 0; y < g.CurrentMap.Height; y++ {
 		for x := 0; x < g.CurrentMap.Width; x++ {
 			if g.CurrentMap.IsWall(x, y) {
@@ -214,12 +217,12 @@ func (g *Game) randomWalkable(exclude map[string]bool) (StartPos, bool) {
 			if exclude != nil && exclude[key] {
 				continue
 			}
-			positions = append(positions, StartPos{X: x, Y: y})
+			positions = append(positions, maps.StartPos{X: x, Y: y})
 		}
 	}
 
 	if len(positions) == 0 {
-		return StartPos{}, false
+		return maps.StartPos{}, false
 	}
 
 	idx := rand.Intn(len(positions))
@@ -318,29 +321,29 @@ func (g *Game) HandleInput(input string) {
 
 	switch input[0] {
 	case 'w', 'W':
-		g.Player.SetDirection(Up)
+		g.Player.SetDirection(actors.Up)
 	case 's', 'S':
-		g.Player.SetDirection(Down)
+		g.Player.SetDirection(actors.Down)
 	case 'a', 'A':
-		g.Player.SetDirection(Left)
+		g.Player.SetDirection(actors.Left)
 	case 'd', 'D':
-		g.Player.SetDirection(Right)
+		g.Player.SetDirection(actors.Right)
 	case 'q', 'Q':
 		g.GameOver = true
 	}
 }
 
 func RunGame(mapFile string) error {
-	maps, err := LoadMapsFromFile(mapFile)
+	mapsList, err := maps.LoadMapsFromFile(mapFile)
 	if err != nil {
 		return fmt.Errorf("failed to load maps: %v", err)
 	}
 
-	if len(maps) == 0 {
+	if len(mapsList) == 0 {
 		return fmt.Errorf("no maps found in file")
 	}
 
-	game := NewGame(maps, false)
+	game := NewGame(mapsList, false)
 	if game == nil {
 		return fmt.Errorf("failed to create game")
 	}

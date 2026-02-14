@@ -1,7 +1,7 @@
 //go:build !nogui
 // +build !nogui
 
-package gopucha
+package ui
 
 import (
 	"fmt"
@@ -19,6 +19,10 @@ import (
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
+
+	"github.com/sjiamnocna/gopucha/internal/actors"
+	"github.com/sjiamnocna/gopucha/internal/gameplay"
+	"github.com/sjiamnocna/gopucha/internal/maps"
 )
 
 const (
@@ -43,7 +47,7 @@ const (
 type GUIGame struct {
 	app             fyne.App
 	window          fyne.Window
-	game            *Game
+	game            *gameplay.Game
 	blockSize       float32
 	canvas          *fyne.Container
 	keyCatcher      *keyCatcher
@@ -287,18 +291,18 @@ func (g *GUIGame) startGame() {
 	}
 
 	// Load maps
-	maps, err := LoadMapsFromFile(g.mapFile)
+	mapsList, err := maps.LoadMapsFromFile(g.mapFile)
 	if err != nil {
 		g.showMapErrorAndClose(err)
 		return
 	}
 
-	if len(maps) == 0 {
+	if len(mapsList) == 0 {
 		g.showMapErrorAndClose(fmt.Errorf("no maps found in file"))
 		return
 	}
 
-	g.game = NewGame(maps, g.disableMonsters)
+	g.game = gameplay.NewGame(mapsList, g.disableMonsters)
 	if g.game == nil {
 		g.showMapErrorAndClose(fmt.Errorf("failed to create game"))
 		return
@@ -466,9 +470,9 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 			g.canvas.Add(rect)
 
 			switch m.Cells[y][x] {
-			case Wall:
+			case maps.Wall:
 				g.drawWallCell(x, y, m)
-			case Dot:
+			case maps.Dot:
 				dotSize := g.blockSize * 0.35
 				dot := canvas.NewCircle(color.RGBA{255, 230, 0, 255}) // Yellow fill
 				dot.StrokeColor = color.RGBA{180, 90, 0, 255}         // Dark orange border
@@ -515,7 +519,7 @@ func (g *GUIGame) updateControlsVisibility() {
 	}
 }
 
-func (g *GUIGame) drawWallCell(x, y int, m *Map) {
+func (g *GUIGame) drawWallCell(x, y int, m *maps.Map) {
 	originX := float32(x) * g.blockSize
 	originY := float32(y) * g.blockSize
 	line := g.blockSize * 0.08
@@ -524,10 +528,10 @@ func (g *GUIGame) drawWallCell(x, y int, m *Map) {
 	}
 
 	mat := strings.ToLower(strings.TrimSpace(m.Material))
-	hasTop := y-1 >= 0 && m.Cells[y-1][x] == Wall
-	hasBottom := y+1 < m.Height && m.Cells[y+1][x] == Wall
-	hasLeft := x-1 >= 0 && m.Cells[y][x-1] == Wall
-	hasRight := x+1 < m.Width && m.Cells[y][x+1] == Wall
+	hasTop := y-1 >= 0 && m.Cells[y-1][x] == maps.Wall
+	hasBottom := y+1 < m.Height && m.Cells[y+1][x] == maps.Wall
+	hasLeft := x-1 >= 0 && m.Cells[y][x-1] == maps.Wall
+	hasRight := x+1 < m.Width && m.Cells[y][x+1] == maps.Wall
 	if mat == "brick" || mat == "bricks" {
 		base := canvas.NewRectangle(color.RGBA{160, 75, 25, 255})
 		base.Resize(fyne.NewSize(g.blockSize, g.blockSize))
@@ -694,7 +698,7 @@ func (g *GUIGame) animateMovement(infoLabel *widget.Label, startPlayer, endPlaye
 	}
 }
 
-func (g *GUIGame) drawPacman(x, y, size float32, dir Direction) {
+func (g *GUIGame) drawPacman(x, y, size float32, dir actors.Direction) {
 	// Draw the Pac-Man circle with mouth cutout
 	// We'll draw filled arcs by creating many small filled rectangles
 
@@ -711,13 +715,13 @@ func (g *GUIGame) drawPacman(x, y, size float32, dir Direction) {
 	// Screen coordinates: 0° = right, 90° = down, 180° = left, 270° = up
 	var directionAngle float64
 	switch dir {
-	case Right:
+	case actors.Right:
 		directionAngle = 0
-	case Down:
+	case actors.Down:
 		directionAngle = math.Pi / 2
-	case Left:
+	case actors.Left:
 		directionAngle = math.Pi
-	case Up:
+	case actors.Up:
 		directionAngle = 3 * math.Pi / 2
 	}
 
@@ -909,19 +913,19 @@ func (g *GUIGame) handleKeyPress(ev *fyne.KeyEvent, infoLabel *widget.Label) {
 	switch ev.Name {
 	case fyne.KeyUp:
 		if g.state == StatePlaying || g.state == StateLevelStart || g.state == StateLevelComplete {
-			g.game.Player.SetDirection(Up)
+			g.game.Player.SetDirection(actors.Up)
 		}
 	case fyne.KeyDown:
 		if g.state == StatePlaying || g.state == StateLevelStart || g.state == StateLevelComplete {
-			g.game.Player.SetDirection(Down)
+			g.game.Player.SetDirection(actors.Down)
 		}
 	case fyne.KeyLeft:
 		if g.state == StatePlaying || g.state == StateLevelStart || g.state == StateLevelComplete {
-			g.game.Player.SetDirection(Left)
+			g.game.Player.SetDirection(actors.Left)
 		}
 	case fyne.KeyRight:
 		if g.state == StatePlaying || g.state == StateLevelStart || g.state == StateLevelComplete {
-			g.game.Player.SetDirection(Right)
+			g.game.Player.SetDirection(actors.Right)
 		}
 	case fyne.KeyEscape:
 		if g.state == StatePlaying {
@@ -1043,7 +1047,7 @@ func (g *GUIGame) startGameLoop() {
 					continue
 				}
 				// Pause finished, move to next level
-				g.game.loadLevel(g.game.CurrentLevel + 1)
+				g.game.LoadLevel(g.game.CurrentLevel + 1)
 				g.state = StateLevelStart
 				g.countdownTicks = 5
 				g.pauseTicks = 0
@@ -1107,8 +1111,8 @@ func (g *GUIGame) startGameLoop() {
 			// Keep the dot visible during movement animation, then remove it at the end
 			if pendingDot {
 				if dotY >= 0 && dotY < g.game.CurrentMap.Height && dotX >= 0 && dotX < g.game.CurrentMap.Width {
-					if g.game.CurrentMap.Cells[dotY][dotX] == Empty {
-						g.game.CurrentMap.Cells[dotY][dotX] = Dot
+					if g.game.CurrentMap.Cells[dotY][dotX] == maps.Empty {
+						g.game.CurrentMap.Cells[dotY][dotX] = maps.Dot
 					}
 				}
 			}

@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/sjiamnocna/gopucha/internal/gopucha"
+	"github.com/sjiamnocna/gopucha/internal/ui"
 )
 
 func main() {
@@ -30,7 +30,7 @@ func main() {
 	}
 
 	// Run GUI game only
-	err := gopucha.RunGUIGame(mapFile, *noMonsters)
+	err := ui.RunGUIGame(mapFile, *noMonsters)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

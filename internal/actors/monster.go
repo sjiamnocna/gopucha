@@ -1,4 +1,6 @@
-package gopucha
+package actors
+
+import "github.com/sjiamnocna/gopucha/internal/maps"
 
 type Monster struct {
 	X         int
@@ -14,7 +16,7 @@ func NewMonster(x, y int, dir Direction) *Monster {
 	}
 }
 
-func (mo *Monster) Move(m *Map, playerX, playerY int, monsters []Monster) {
+func (mo *Monster) Move(m *maps.Map, playerX, playerY int, monsters []Monster) {
 	newX, newY := mo.X, mo.Y
 	dx, dy := directionDelta(mo.Direction)
 	newX += dx
@@ -40,7 +42,7 @@ func (mo *Monster) Move(m *Map, playerX, playerY int, monsters []Monster) {
 	}
 }
 
-func (mo *Monster) chooseDirection(m *Map, playerX, playerY int, monsters []Monster) Direction {
+func (mo *Monster) chooseDirection(m *maps.Map, playerX, playerY int, monsters []Monster) Direction {
 	bestDir := mo.Direction
 	bestDist := -1
 	distMap := bfsDistanceMap(m, playerX, playerY, monsters, mo)
@@ -73,7 +75,7 @@ func (mo *Monster) chooseDirection(m *Map, playerX, playerY int, monsters []Mons
 	return bestDir
 }
 
-func bfsDistanceMap(m *Map, targetX, targetY int, monsters []Monster, self *Monster) [][]int {
+func bfsDistanceMap(m *maps.Map, targetX, targetY int, monsters []Monster, self *Monster) [][]int {
 	dist := make([][]int, m.Height)
 	for y := range dist {
 		dist[y] = make([]int, m.Width)

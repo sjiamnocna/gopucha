@@ -1,6 +1,10 @@
-package gopucha
+package actors
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/sjiamnocna/gopucha/internal/maps"
+)
 
 type Direction int
 
@@ -30,7 +34,7 @@ func NewPlayer(x, y int) *Player {
 	}
 }
 
-func (p *Player) Move(m *Map) {
+func (p *Player) Move(m *maps.Map) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 

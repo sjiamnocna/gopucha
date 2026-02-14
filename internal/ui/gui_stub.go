@@ -1,7 +1,7 @@
 //go:build nogui
 // +build nogui
 
-package gopucha
+package ui
 
 import "fmt"
 

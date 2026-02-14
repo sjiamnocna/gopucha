@@ -1,4 +1,4 @@
-package gopucha
+package maps
 
 import (
 	"bufio"
@@ -31,6 +31,12 @@ type Map struct {
 type StartPos struct {
 	X int
 	Y int
+}
+
+// Creature represents anything with X, Y coordinates (used for rendering)
+type Creature interface {
+	GetX() int
+	GetY() int
 }
 
 func LoadMapsFromFile(filename string) ([]Map, error) {
@@ -436,7 +442,7 @@ func (m *Map) CountDots() int {
 	return count
 }
 
-func (m *Map) Render(playerX, playerY int, monsters []Monster) {
+func (m *Map) Render(playerX, playerY int, creatures interface{}) {
 	fmt.Print("\033[H\033[2J") // Clear screen
 
 	for y := 0; y < m.Height; y++ {
@@ -444,19 +450,6 @@ func (m *Map) Render(playerX, playerY int, monsters []Monster) {
 			// Check if player is at this position
 			if x == playerX && y == playerY {
 				fmt.Print("\033[33mC\033[0m") // Yellow C (Pac-Man)
-				continue
-			}
-
-			// Check if any monster is at this position
-			isMonster := false
-			for _, monster := range monsters {
-				if monster.X == x && monster.Y == y {
-					fmt.Print("\033[31mM\033[0m") // Red M (Monster)
-					isMonster = true
-					break
-				}
-			}
-			if isMonster {
 				continue
 			}
 
