@@ -126,12 +126,13 @@ func TestGameLoadLevelSetsSpeedModifier(t *testing.T) {
 }
 
 func TestDotScoringWithSpeedModifier(t *testing.T) {
-	// Create a simple test map
+	// Create a simple test map with multiple dots
 	mapLines := []string{
 		"speedModifier: 1.5",
-		"OOO",
-		"O-O",
-		"OOO",
+		"OOOOO",
+		"O---O",
+		"O-O-O",
+		"OOOOO",
 	}
 
 	m, err := parseMap(mapLines)
@@ -147,8 +148,8 @@ func TestDotScoringWithSpeedModifier(t *testing.T) {
 	initialScore := game.Score
 	dotCountBefore := game.CurrentMap.CountDots()
 
-	// Place player on a dot and update
-	game.Player.X = 1
+	// Player starts at (1,1) and dot there is removed, so move to adjacent dot at (2,1)
+	game.Player.X = 2
 	game.Player.Y = 1
 	game.Update()
 

@@ -60,6 +60,8 @@ func (g *Game) loadLevel(level int) {
 		}
 	}
 PlayerPlaced:
+	// Remove dot at player's starting position
+	g.CurrentMap.EatDot(g.Player.X, g.Player.Y)
 	if g.DisableMonsters {
 		g.Monsters = nil
 		return

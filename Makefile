@@ -18,7 +18,7 @@ BIN_PATH := $(BIN_DIR)/$(APP_NAME)
 # Build flags for optimization
 BUILD_FLAGS := -ldflags="-s -w" -trimpath
 
-.PHONY: build build-optimized run test clean
+.PHONY: build build-optimized run dev test clean
 
 # Standard build
 build: $(BIN_DIR)
@@ -33,9 +33,6 @@ dev:
 # Optimized build with size reduction flags
 build-optimized: $(BIN_DIR)
 	$(GO) build $(BUILD_FLAGS) -o "$(BIN_PATH)" ./cmd/$(APP_NAME)
-# Run the game with default map
-run: build
-	./$(BIN_PATH)
 
 # Run unit tests
 test:
