@@ -128,6 +128,7 @@ func TestGameLoadLevelSetsSpeedModifier(t *testing.T) {
 func TestDotScoringWithSpeedModifier(t *testing.T) {
 	// Create a simple test map with multiple dots
 	mapLines := []string{
+		"playerStart: 1,1",
 		"speedModifier: 1.5",
 		"OOOOO",
 		"O---O",

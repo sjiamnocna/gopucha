@@ -2,6 +2,7 @@ package gopucha
 
 import (
 	"fmt"
+	"math/rand"
 	"time"
 )
 
@@ -21,6 +22,8 @@ type Game struct {
 	CurrentSpeedModifier float64
 	LevelCompleted bool
 }
+
+const defaultMinMonsterDistance = 5
 
 func NewGame(maps []Map, disableMonsters bool) *Game {
 	if len(maps) == 0 {
@@ -57,16 +60,17 @@ func (g *Game) loadLevel(level int) {
 
 func (g *Game) placePlayer() {
 	// Reset player to starting position with cleared input queue
-	// Place player at top-left corner (first non-wall position)
-	for y := 0; y < g.CurrentMap.Height; y++ {
-		for x := 0; x < g.CurrentMap.Width; x++ {
-			if !g.CurrentMap.IsWall(x, y) {
-				g.Player = NewPlayer(x, y)
-				return
-			}
-		}
+	if g.CurrentMap.PlayerStart != nil {
+		g.Player = NewPlayer(g.CurrentMap.PlayerStart.X, g.CurrentMap.PlayerStart.Y)
+		return
 	}
-	
+
+	pos, ok := g.randomWalkable(nil)
+	if ok {
+		g.Player = NewPlayer(pos.X, pos.Y)
+		return
+	}
+
 	// Fallback
 	g.Player = NewPlayer(1, 1)
 }
@@ -88,57 +92,35 @@ func (g *Game) placeMonsters() {
 
 	// Place monsters
 	g.Monsters = []Monster{}
-	// Corner positions: prioritize opposite corners from player (bottom-right first)
-	// Reordered to start from bottom-right, away from top-left where player spawns
-	cornerPositions := [][2]int{
-		{g.CurrentMap.Width - 2, g.CurrentMap.Height - 2}, // Bottom-right
-		{1, g.CurrentMap.Height - 2},                      // Bottom-left
-		{g.CurrentMap.Width - 2, 1},                       // Top-right
-		{1, 1},                                             // Top-left (last resort)
-	}
+	used := make(map[string]bool)
+	used[fmt.Sprintf("%d,%d", g.Player.X, g.Player.Y)] = true
+	distMap := distanceMapFrom(g.CurrentMap, g.Player.X, g.Player.Y)
 
-	usedCorners := make(map[int]bool)
-
+	// Use explicit starts first
+	startIdx := 0
 	for i := 0; i < numMonsters; i++ {
 		var x, y int
 		found := false
-
-		// Try to find an unblocked corner
-		for j := 0; j < len(cornerPositions); j++ {
-			cornerIdx := (i + j) % len(cornerPositions)
-			if usedCorners[cornerIdx] {
-				continue
-			}
-
-			pos := cornerPositions[cornerIdx]
-			cx, cy := pos[0], pos[1]
-
-			// Adjust if out of bounds
-			if cx >= g.CurrentMap.Width {
-				cx = g.CurrentMap.Width - 1
-			}
-			if cy >= g.CurrentMap.Height {
-				cy = g.CurrentMap.Height - 1
-			}
-
-			// Check if corner is valid and not at player position
-			if !g.CurrentMap.IsWall(cx, cy) && (cx != g.Player.X || cy != g.Player.Y) {
-				x, y = cx, cy
-				usedCorners[cornerIdx] = true
+		if startIdx < len(g.CurrentMap.MonsterStarts) {
+			pos := g.CurrentMap.MonsterStarts[startIdx]
+			startIdx++
+			key := fmt.Sprintf("%d,%d", pos.X, pos.Y)
+			if !g.CurrentMap.IsWall(pos.X, pos.Y) && !used[key] {
+				x, y = pos.X, pos.Y
+				used[key] = true
 				found = true
-				break
 			}
 		}
 
-		// If no corner available, search for any valid position
 		if !found {
-			for dy := 0; dy < g.CurrentMap.Height && !found; dy++ {
-				for dx := 0; dx < g.CurrentMap.Width && !found; dx++ {
-					if !g.CurrentMap.IsWall(dx, dy) && (dx != g.Player.X || dy != g.Player.Y) {
-						x, y = dx, dy
-						found = true
-					}
-				}
+			pos, ok := g.randomWalkableWithMinDistance(used, distMap, defaultMinMonsterDistance)
+			if !ok {
+				pos, ok = g.randomWalkable(used)
+			}
+			if ok {
+				x, y = pos.X, pos.Y
+				used[fmt.Sprintf("%d,%d", x, y)] = true
+				found = true
 			}
 		}
 
@@ -149,6 +131,99 @@ func (g *Game) placeMonsters() {
 		dir := Direction(i % 4)
 		g.Monsters = append(g.Monsters, *NewMonster(x, y, dir))
 	}
+}
+
+func (g *Game) randomWalkableWithMinDistance(exclude map[string]bool, distMap [][]int, minDist int) (StartPos, bool) {
+	positions := make([]StartPos, 0)
+	for y := 0; y < g.CurrentMap.Height; y++ {
+		for x := 0; x < g.CurrentMap.Width; x++ {
+			if g.CurrentMap.IsWall(x, y) {
+				continue
+			}
+			if distMap[y][x] < minDist {
+				continue
+			}
+			key := fmt.Sprintf("%d,%d", x, y)
+			if exclude != nil && exclude[key] {
+				continue
+			}
+			positions = append(positions, StartPos{X: x, Y: y})
+		}
+	}
+
+	if len(positions) == 0 {
+		return StartPos{}, false
+	}
+
+	idx := rand.Intn(len(positions))
+	return positions[idx], true
+}
+
+func distanceMapFrom(m *Map, startX, startY int) [][]int {
+	dist := make([][]int, m.Height)
+	for y := 0; y < m.Height; y++ {
+		dist[y] = make([]int, m.Width)
+		for x := 0; x < m.Width; x++ {
+			dist[y][x] = -1
+		}
+	}
+
+	if startX < 0 || startY < 0 || startX >= m.Width || startY >= m.Height {
+		return dist
+	}
+	if m.IsWall(startX, startY) {
+		return dist
+	}
+
+	queueX := []int{startX}
+	queueY := []int{startY}
+	dist[startY][startX] = 0
+
+	for len(queueX) > 0 {
+		x := queueX[0]
+		y := queueY[0]
+		queueX = queueX[1:]
+		queueY = queueY[1:]
+
+		neighbors := [][2]int{{x + 1, y}, {x - 1, y}, {x, y + 1}, {x, y - 1}}
+		for _, n := range neighbors {
+			nx, ny := n[0], n[1]
+			if nx < 0 || ny < 0 || nx >= m.Width || ny >= m.Height {
+				continue
+			}
+			if m.IsWall(nx, ny) || dist[ny][nx] != -1 {
+				continue
+			}
+			dist[ny][nx] = dist[y][x] + 1
+			queueX = append(queueX, nx)
+			queueY = append(queueY, ny)
+		}
+	}
+
+	return dist
+}
+
+func (g *Game) randomWalkable(exclude map[string]bool) (StartPos, bool) {
+	positions := make([]StartPos, 0)
+	for y := 0; y < g.CurrentMap.Height; y++ {
+		for x := 0; x < g.CurrentMap.Width; x++ {
+			if g.CurrentMap.IsWall(x, y) {
+				continue
+			}
+			key := fmt.Sprintf("%d,%d", x, y)
+			if exclude != nil && exclude[key] {
+				continue
+			}
+			positions = append(positions, StartPos{X: x, Y: y})
+		}
+	}
+
+	if len(positions) == 0 {
+		return StartPos{}, false
+	}
+
+	idx := rand.Intn(len(positions))
+	return positions[idx], true
 }
 
 func (g *Game) Update() {

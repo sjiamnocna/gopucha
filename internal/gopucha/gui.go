@@ -428,10 +428,7 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 		if i < len(monsterPos) {
 			pos = monsterPos[i]
 		}
-		rect := canvas.NewRectangle(color.RGBA{255, 0, 0, 255}) // Red monsters
-		rect.Resize(fyne.NewSize(g.blockSize*0.8, g.blockSize*0.8))
-		rect.Move(fyne.NewPos(pos.x*g.blockSize+g.blockSize*0.1, pos.y*g.blockSize+g.blockSize*0.1))
-		g.canvas.Add(rect)
+		g.drawMonster(pos.x*g.blockSize+g.blockSize*0.1, pos.y*g.blockSize+g.blockSize*0.1, g.blockSize*0.8)
 	}
 
 	// Render player (yellow semi-circle with mouth)
@@ -554,6 +551,44 @@ func (g *GUIGame) drawWallCell(x, y int, m *Map) {
 	g.canvas.Add(defaultWall)
 }
 
+func (g *GUIGame) drawMonster(x, y, size float32) {
+	bodyColor := color.RGBA{255, 0, 0, 255}
+	radius := size * 0.2
+
+	// Body with rounded top corners
+	body := canvas.NewRectangle(bodyColor)
+	body.Resize(fyne.NewSize(size, size-radius))
+	body.Move(fyne.NewPos(x, y+radius))
+	g.canvas.Add(body)
+
+	leftTop := canvas.NewCircle(bodyColor)
+	leftTop.Resize(fyne.NewSize(radius*2, radius*2))
+	leftTop.Move(fyne.NewPos(x, y))
+	g.canvas.Add(leftTop)
+
+	rightTop := canvas.NewCircle(bodyColor)
+	rightTop.Resize(fyne.NewSize(radius*2, radius*2))
+	rightTop.Move(fyne.NewPos(x+size-radius*2, y))
+	g.canvas.Add(rightTop)
+
+	// Teeth row at about 3/4 height
+	teethY := y + size*0.75
+	toothHeight := size * 0.12
+	toothWidth := size * 0.12
+	startX := x + size*0.18
+	gap := size * 0.05
+	for i := 0; i < 4; i++ {
+		toothColor := color.RGBA{255, 255, 255, 255}
+		if i%2 == 1 {
+			toothColor = color.RGBA{0, 0, 0, 255}
+		}
+		tooth := canvas.NewRectangle(toothColor)
+		tooth.Resize(fyne.NewSize(toothWidth, toothHeight))
+		tooth.Move(fyne.NewPos(startX+float32(i)*(toothWidth+gap), teethY))
+		g.canvas.Add(tooth)
+	}
+}
+
 func (g *GUIGame) capturePositions() (renderPos, []renderPos) {
 	playerPos := renderPos{x: float32(g.game.Player.X), y: float32(g.game.Player.Y)}
 	monsterPos := make([]renderPos, len(g.game.Monsters))
@@ -659,6 +694,15 @@ func (g *GUIGame) drawPacman(x, y, size float32, dir Direction) {
 			g.canvas.Add(pixel)
 		}
 	}
+
+	// Draw eye (two-thirds from left, one-third from top)
+	eyeSize := size * 0.12
+	eyeX := x + size*(2.0/3.0) - eyeSize/2
+	eyeY := y + size*(1.0/3.0) - eyeSize/2
+	eye := canvas.NewCircle(color.RGBA{180, 180, 180, 255})
+	eye.Resize(fyne.NewSize(eyeSize, eyeSize))
+	eye.Move(fyne.NewPos(eyeX, eyeY))
+	g.canvas.Add(eye)
 }
 
 func (g *GUIGame) angleInRange(angle, start, end float64) bool {
@@ -960,6 +1004,13 @@ func (g *GUIGame) startGameLoop() {
 			g.game.Update()
 			endPlayer, endMonsters := g.capturePositions()
 
+			pendingDot := false
+			dotX, dotY := 0, 0
+			if g.game.DotEaten {
+				dotX, dotY = g.game.Player.X, g.game.Player.Y
+				pendingDot = true
+			}
+
 			// Mouth animation: smooth open/close on dot eat
 			if g.game.DotEaten {
 				g.startMouthAnimation()
@@ -995,7 +1046,20 @@ func (g *GUIGame) startGameLoop() {
 				continue
 			}
 
+			// Keep the dot visible during movement animation, then remove it at the end
+			if pendingDot {
+				if dotY >= 0 && dotY < g.game.CurrentMap.Height && dotX >= 0 && dotX < g.game.CurrentMap.Width {
+					if g.game.CurrentMap.Cells[dotY][dotX] == Empty {
+						g.game.CurrentMap.Cells[dotY][dotX] = Dot
+					}
+				}
+			}
+
 			g.animateMovement(g.infoLabel, startPlayer, endPlayer, startMonsters, endMonsters)
+
+			if pendingDot {
+				g.game.CurrentMap.EatDot(dotX, dotY)
+			}
 		}
 	}()
 }

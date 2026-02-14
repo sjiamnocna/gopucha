@@ -24,6 +24,13 @@ type Map struct {
 	Material     string
 	MonsterCount int
 	SpeedModifier float64
+	PlayerStart  *StartPos
+	MonsterStarts []StartPos
+}
+
+type StartPos struct {
+	X int
+	Y int
 }
 
 func LoadMapsFromFile(filename string) ([]Map, error) {
@@ -119,6 +126,8 @@ func parseMap(lines []string) (Map, error) {
 	monsterCount := 1
 	monsterCountSet := false
 	speedModifier := 1.0
+	var playerStart *StartPos
+	var monsterStarts []StartPos
 	var gridLines []string
 
 	for _, line := range lines {
@@ -138,6 +147,20 @@ func parseMap(lines []string) (Map, error) {
 				continue
 			case "material":
 				material = value
+				continue
+			case "playerstart":
+				pos, err := parseStartPair(value)
+				if err != nil {
+					return Map{}, fmt.Errorf("invalid playerStart: %q", value)
+				}
+				playerStart = &pos
+				continue
+			case "monsterstart", "monsterstarts":
+				list, err := parseStartList(value)
+				if err != nil {
+					return Map{}, fmt.Errorf("invalid monsterStarts: %q", value)
+				}
+				monsterStarts = append(monsterStarts, list...)
 				continue
 			case "monsters":
 				count, err := strconv.Atoi(value)
@@ -202,21 +225,91 @@ func parseMap(lines []string) (Map, error) {
 		Material:      material,
 		MonsterCount:  monsterCount,
 		SpeedModifier: speedModifier,
+		PlayerStart:   playerStart,
+		MonsterStarts: monsterStarts,
 	}, nil
+}
+
+func parseStartPair(value string) (StartPos, error) {
+	parts := strings.Split(value, ",")
+	if len(parts) != 2 {
+		return StartPos{}, fmt.Errorf("expected x,y")
+	}
+	xStr := strings.TrimSpace(parts[0])
+	yStr := strings.TrimSpace(parts[1])
+	x, err := strconv.Atoi(xStr)
+	if err != nil {
+		return StartPos{}, err
+	}
+	y, err := strconv.Atoi(yStr)
+	if err != nil {
+		return StartPos{}, err
+	}
+	return StartPos{X: x, Y: y}, nil
+}
+
+func parseStartList(value string) ([]StartPos, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, nil
+	}
+	parts := strings.Split(value, ";")
+	positions := make([]StartPos, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		pos, err := parseStartPair(part)
+		if err != nil {
+			return nil, err
+		}
+		positions = append(positions, pos)
+	}
+	return positions, nil
 }
 
 func validateMap(m *Map) error {
 	startX, startY := -1, -1
-	for y := 0; y < m.Height && startX == -1; y++ {
-		for x := 0; x < m.Width; x++ {
-			if m.Cells[y][x] != Wall {
-				startX, startY = x, y
-				break
+	if m.PlayerStart != nil {
+		if m.PlayerStart.X < 0 || m.PlayerStart.Y < 0 || m.PlayerStart.X >= m.Width || m.PlayerStart.Y >= m.Height {
+			return fmt.Errorf("playerStart is out of bounds (%d,%d)", m.PlayerStart.X, m.PlayerStart.Y)
+		}
+		if m.Cells[m.PlayerStart.Y][m.PlayerStart.X] == Wall {
+			return fmt.Errorf("playerStart is on a wall (%d,%d)", m.PlayerStart.X, m.PlayerStart.Y)
+		}
+		startX, startY = m.PlayerStart.X, m.PlayerStart.Y
+	} else {
+		for y := 0; y < m.Height && startX == -1; y++ {
+			for x := 0; x < m.Width; x++ {
+				if m.Cells[y][x] != Wall {
+					startX, startY = x, y
+					break
+				}
 			}
 		}
+		if startX == -1 {
+			return fmt.Errorf("map has no walkable cells")
+		}
 	}
-	if startX == -1 {
-		return fmt.Errorf("map has no walkable cells")
+
+	used := make(map[string]bool)
+	if m.PlayerStart != nil {
+		key := fmt.Sprintf("%d,%d", m.PlayerStart.X, m.PlayerStart.Y)
+		used[key] = true
+	}
+	for _, pos := range m.MonsterStarts {
+		if pos.X < 0 || pos.Y < 0 || pos.X >= m.Width || pos.Y >= m.Height {
+			return fmt.Errorf("monsterStart is out of bounds (%d,%d)", pos.X, pos.Y)
+		}
+		if m.Cells[pos.Y][pos.X] == Wall {
+			return fmt.Errorf("monsterStart is on a wall (%d,%d)", pos.X, pos.Y)
+		}
+		key := fmt.Sprintf("%d,%d", pos.X, pos.Y)
+		if used[key] {
+			return fmt.Errorf("duplicate start position (%d,%d)", pos.X, pos.Y)
+		}
+		used[key] = true
 	}
 
 

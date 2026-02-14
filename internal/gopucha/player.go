@@ -39,15 +39,7 @@ func (p *Player) Move(m *Map) {
 		dx, dy := directionDelta(p.Desired)
 		if !m.IsWall(p.X+dx, p.Y+dy) {
 			p.Direction = p.Desired
-			if len(p.Queue) > 0 {
-				p.Desired = p.Queue[0]
-				p.Queue = p.Queue[1:]
-			}
 		}
-	} else if len(p.Queue) > 0 {
-		// Pop next direction from queue
-		p.Desired = p.Queue[0]
-		p.Queue = p.Queue[1:]
 	}
 
 	newX, newY := p.X, p.Y
@@ -60,11 +52,6 @@ func (p *Player) Move(m *Map) {
 		p.Y = newY
 	}
 	
-	// Safety measure: if queue somehow grows beyond expected size, trim it
-	// (should never happen with normal SetDirection usage)
-	if len(p.Queue) > 5 {
-		p.Queue = p.Queue[:3]
-	}
 }
 
 func (p *Player) SetDirection(d Direction) {
@@ -75,20 +62,8 @@ func (p *Player) SetDirection(d Direction) {
 		return
 	}
 
-	if p.Desired == p.Direction {
-		p.Desired = d
-		return
-	}
-
-	if len(p.Queue) > 0 && p.Queue[len(p.Queue)-1] == d {
-		return
-	}
-
-	if len(p.Queue) >= 3 {
-		p.Queue[len(p.Queue)-1] = d
-		return
-	}
-	p.Queue = append(p.Queue, d)
+	// Last pressed direction always wins
+	p.Desired = d
 }
 
 func directionDelta(d Direction) (int, int) {
