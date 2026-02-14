@@ -177,3 +177,152 @@ OOO
 		t.Errorf("Player should not move through wall, got position (%d, %d)", player.X, player.Y)
 	}
 }
+func TestParseMapMetaLine(t *testing.T) {
+	tests := []struct {
+		name      string
+		line      string
+		wantKey   string
+		wantValue string
+	}{
+		{
+			name:      "colon format",
+			line:      "name: Test Map",
+			wantKey:   "name",
+			wantValue: "Test Map",
+		},
+		{
+			name:      "equals format",
+			line:      "speedmodifier=1.5",
+			wantKey:   "speedmodifier",
+			wantValue: "1.5",
+		},
+		{
+			name:      "colon with spaces",
+			line:      "  material  :  classic  ",
+			wantKey:   "material",
+			wantValue: "classic",
+		},
+		{
+			name:      "equals with spaces",
+			line:      "  monsters  =  2  ",
+			wantKey:   "monsters",
+			wantValue: "2",
+		},
+		{
+			name:      "no separator",
+			line:      "invalid line",
+			wantKey:   "",
+			wantValue: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key, value := parseMapMetaLine(tt.line)
+			if key != tt.wantKey || value != tt.wantValue {
+				t.Errorf("parseMapMetaLine(%q) = (%q, %q), want (%q, %q)",
+					tt.line, key, value, tt.wantKey, tt.wantValue)
+			}
+		})
+	}
+}
+
+func TestParseMapSpeedModifier(t *testing.T) {
+	tests := []struct {
+		name        string
+		lines       []string
+		wantSpeed   float64
+		wantErr     bool
+	}{
+		{
+			name: "valid speedModifier 1.0",
+			lines: []string{
+				"name: Test",
+				"speedModifier: 1.0",
+				"OOOOO",
+				"O---O",
+				"OOOOO",
+			},
+			wantSpeed: 1.0,
+			wantErr:   false,
+		},
+		{
+			name: "valid speedModifier 0.5",
+			lines: []string{
+				"speedModifier: 0.5",
+				"OOOOO",
+				"O---O",
+				"OOOOO",
+			},
+			wantSpeed: 0.5,
+			wantErr:   false,
+		},
+		{
+			name: "valid speedModifier 2.0",
+			lines: []string{
+				"speedModifier: 2.0",
+				"OOOOO",
+				"O---O",
+				"OOOOO",
+			},
+			wantSpeed: 2.0,
+			wantErr:   false,
+		},
+		{
+			name: "invalid speedModifier too low",
+			lines: []string{
+				"speedModifier: 0.4",
+				"OOOOO",
+				"O---O",
+				"OOOOO",
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid speedModifier too high",
+			lines: []string{
+				"speedModifier: 2.1",
+				"OOOOO",
+				"O---O",
+				"OOOOO",
+			},
+			wantErr: true,
+		},
+		{
+			name: "default speedModifier when not specified",
+			lines: []string{
+				"name: Test",
+				"OOOOO",
+				"O---O",
+				"OOOOO",
+			},
+			wantSpeed: 1.0,
+			wantErr:   false,
+		},
+		{
+			name: "speedModifier with equals format",
+			lines: []string{
+				"speedModifier=1.5",
+				"OOOOO",
+				"O---O",
+				"OOOOO",
+			},
+			wantSpeed: 1.5,
+			wantErr:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m, err := parseMap(tt.lines)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseMap() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && m.SpeedModifier != tt.wantSpeed {
+				t.Errorf("parseMap() SpeedModifier = %v, want %v",
+					m.SpeedModifier, tt.wantSpeed)
+			}
+		})
+	}
+}

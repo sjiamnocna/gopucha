@@ -30,7 +30,9 @@ type GameState int
 
 const (
 	StateSettings GameState = iota
+	StateLevelStart
 	StatePlaying
+	StateLevelComplete
 	StateGameOver
 	StateWon
 )
@@ -48,6 +50,7 @@ type GUIGame struct {
 	infoLabel    *widget.Label
 	state        GameState
 	countdownTicks int
+	pauseTicks     int
 	tickerDone    chan bool
 	mouthOpen     bool
 	mouthOpenRatio float64
@@ -243,29 +246,65 @@ func (g *GUIGame) startGame() {
 	// Load maps
 	maps, err := LoadMapsFromFile(g.mapFile)
 	if err != nil {
-		dialog.ShowError(err, g.window)
+		g.showMapErrorAndClose(err)
 		return
 	}
 
 	if len(maps) == 0 {
-		dialog.ShowError(fmt.Errorf("no maps found in file"), g.window)
+		g.showMapErrorAndClose(fmt.Errorf("no maps found in file"))
 		return
 	}
 
 	g.game = NewGame(maps, g.disableMonsters)
 	if g.game == nil {
-		dialog.ShowError(fmt.Errorf("failed to create game"), g.window)
+		g.showMapErrorAndClose(fmt.Errorf("failed to create game"))
 		return
 	}
 
-	g.state = StatePlaying
+	g.state = StateLevelStart
 	g.countdownTicks = 5
+	g.pauseTicks = 0
 	g.mouthOpen = false
 	g.mouthOpenRatio = 0
 	g.mouthAnimDir = 0
 	g.setupGameUI()
 	g.startGameLoop()
 	g.initControls()
+}
+
+func (g *GUIGame) showMapErrorAndClose(err error) {
+	msg := widget.NewLabel(err.Error())
+	msg.Wrapping = fyne.TextWrapWord
+
+	mapFiles := g.findMapFiles()
+	selectLabel := widget.NewLabel("Select another map:")
+	mapSelect := widget.NewSelect(mapFiles, func(selected string) {})
+	if len(mapFiles) > 0 {
+		mapSelect.SetSelected(mapFiles[0])
+	}
+
+	content := container.NewVBox(msg)
+	if len(mapFiles) > 0 {
+		content.Add(selectLabel)
+		content.Add(mapSelect)
+	}
+	key := newKeyCatcher(func(ev *fyne.KeyEvent) {
+		g.window.Close()
+	})
+	stack := container.NewStack(content, key)
+
+	d := dialog.NewCustomConfirm("Map Error", "Load selected", "Exit", stack, func(apply bool) {
+		if apply {
+			if mapSelect.Selected != "" {
+				g.mapFile = mapSelect.Selected
+				g.startGame()
+				return
+			}
+		}
+		g.window.Close()
+	}, g.window)
+	d.Show()
+	g.window.Canvas().Focus(key)
 }
 
 func (g *GUIGame) setupGameUI() {
@@ -569,37 +608,42 @@ func (g *GUIGame) handleKeyPress(ev *fyne.KeyEvent, infoLabel *widget.Label) {
 		}
 	}
 
-	if g.state != StatePlaying || g.game == nil {
+	if g.game == nil {
 		return
 	}
 
-	// Allow direction input during countdown to queue movement
+	// Allow direction input during countdown/pause to queue movement
 	switch ev.Name {
 	case fyne.KeyUp:
-		g.game.Player.SetDirection(Up)
+		if g.state == StatePlaying || g.state == StateLevelStart || g.state == StateLevelComplete {
+			g.game.Player.SetDirection(Up)
+		}
 	case fyne.KeyDown:
-		g.game.Player.SetDirection(Down)
+		if g.state == StatePlaying || g.state == StateLevelStart || g.state == StateLevelComplete {
+			g.game.Player.SetDirection(Down)
+		}
 	case fyne.KeyLeft:
-		g.game.Player.SetDirection(Left)
+		if g.state == StatePlaying || g.state == StateLevelStart || g.state == StateLevelComplete {
+			g.game.Player.SetDirection(Left)
+		}
 	case fyne.KeyRight:
-		g.game.Player.SetDirection(Right)
+		if g.state == StatePlaying || g.state == StateLevelStart || g.state == StateLevelComplete {
+			g.game.Player.SetDirection(Right)
+		}
 	case fyne.KeyEscape:
-		g.showSettings()
+		if g.state == StatePlaying {
+			g.showSettings()
+		}
 	case fyne.KeyEqual, fyne.KeyPlus:
-		// + to zoom in
-		if g.countdownTicks == 0 {
+		// + to zoom in (only during playing, not during countdown/pause)
+		if g.state == StatePlaying {
 			g.zoomIn(infoLabel)
 		}
 	case fyne.KeyMinus:
-		// - to zoom out
-		if g.countdownTicks == 0 {
+		// - to zoom out (only during playing, not during countdown/pause)
+		if g.state == StatePlaying {
 			g.zoomOut(infoLabel)
 		}
-	}
-
-	// Ignore other gameplay during countdown
-	if g.countdownTicks > 0 {
-		return
 	}
 }
 
@@ -627,12 +671,34 @@ func (g *GUIGame) startGameLoop() {
 		}()
 
 		for range g.ticker.C {
-			// Handle countdown phase
-			if g.countdownTicks > 0 {
-				g.countdownTicks--
-				fyne.DoAndWait(func() {
-					g.renderGameWithCountdown(g.infoLabel)
-				})
+			// Handle level start countdown phase
+			if g.state == StateLevelStart {
+				if g.countdownTicks > 0 {
+					g.countdownTicks--
+					fyne.DoAndWait(func() {
+						g.renderGameWithCountdown(g.infoLabel)
+					})
+					continue
+				}
+				// Countdown finished, start playing
+				g.state = StatePlaying
+				continue
+			}
+
+			// Handle level completion pause
+			if g.state == StateLevelComplete {
+				if g.pauseTicks > 0 {
+					g.pauseTicks--
+					fyne.DoAndWait(func() {
+						g.renderGame(g.infoLabel)
+					})
+					continue
+				}
+				// Pause finished, move to next level
+				g.game.loadLevel(g.game.CurrentLevel + 1)
+				g.state = StateLevelStart
+				g.countdownTicks = 5
+				g.pauseTicks = 0
 				continue
 			}
 
@@ -651,6 +717,14 @@ func (g *GUIGame) startGameLoop() {
 				return
 			}
 
+			// Only update game during StatePlaying
+			if g.state != StatePlaying {
+				fyne.DoAndWait(func() {
+					g.renderGame(g.infoLabel)
+				})
+				continue
+			}
+
 			g.game.Update()
 
 			// Mouth animation: smooth open/close on dot eat
@@ -662,12 +736,20 @@ func (g *GUIGame) startGameLoop() {
 			if g.game.LifeLost {
 				g.countdownTicks = 5
 				g.game.LifeLost = false
+				g.state = StateLevelStart
 			}
 
-			// Auto-advance to next level when all dots eaten
-			if g.game.CurrentMap.CountDots() == 0 {
-				g.game.loadLevel(g.game.CurrentLevel + 1)
-				g.countdownTicks = 5
+			// Check if level is completed
+			if g.game.LevelCompleted {
+				g.game.LevelCompleted = false
+				
+				// Check if all levels are done
+				if g.game.CurrentLevel+1 >= len(g.game.Maps) {
+					g.game.Won = true
+				} else {
+					g.state = StateLevelComplete
+					g.pauseTicks = 2 // 2 tick pause
+				}
 			}
 
 			fyne.DoAndWait(func() {

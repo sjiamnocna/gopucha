@@ -18,6 +18,8 @@ type Game struct {
 	LifeLost      bool
 	DisableMonsters bool
 	DotEaten      bool
+	CurrentSpeedModifier float64
+	LevelCompleted bool
 }
 
 func NewGame(maps []Map, disableMonsters bool) *Game {
@@ -45,6 +47,7 @@ func (g *Game) loadLevel(level int) {
 	
 	g.CurrentLevel = level
 	g.CurrentMap = &g.Maps[level]
+	g.CurrentSpeedModifier = g.CurrentMap.SpeedModifier
 	
 	// Place player at first non-wall position
 	g.Player = NewPlayer(1, 1)
@@ -61,24 +64,15 @@ PlayerPlaced:
 		g.Monsters = nil
 		return
 	}
-	
-	// Calculate number of monsters based on available space
-	availableSpaces := 0
-	for y := 0; y < g.CurrentMap.Height; y++ {
-		for x := 0; x < g.CurrentMap.Width; x++ {
-			if !g.CurrentMap.IsWall(x, y) {
-				availableSpaces++
-			}
-		}
+
+	// Use map-defined monster count
+	numMonsters := g.CurrentMap.MonsterCount
+	if numMonsters < 0 {
+		numMonsters = 0
 	}
-	
-	// 1 monster per 5-10 available spaces, min 1, max 4
-	numMonsters := availableSpaces / 7
-	if numMonsters < 1 {
-		numMonsters = 1
-	}
-	if numMonsters > 4 {
-		numMonsters = 4
+	if numMonsters == 0 {
+		g.Monsters = nil
+		return
 	}
 	
 	// Place monsters
@@ -156,7 +150,9 @@ func (g *Game) Update() {
 	// Check if player ate a dot
 	if g.CurrentMap.HasDot(g.Player.X, g.Player.Y) {
 		g.CurrentMap.EatDot(g.Player.X, g.Player.Y)
-		g.Score += 10
+		baseScore := 10
+		adjustedScore := int(float64(baseScore) * g.CurrentSpeedModifier)
+		g.Score += adjustedScore
 		g.DotEaten = true
 	} else {
 		g.DotEaten = false
@@ -193,8 +189,8 @@ func (g *Game) Update() {
 	
 	// Check if all dots are eaten
 	if g.CurrentMap.CountDots() == 0 {
-		// Load next level
-		g.loadLevel(g.CurrentLevel + 1)
+		// Mark level as completed, GUI will handle pause and advance
+		g.LevelCompleted = true
 	}
 }
 

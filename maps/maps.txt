@@ -1,18 +1,29 @@
+name: Test Map 1
+material: classic
+monsters: 2
+speedModifier: 1.0
 OOOOO
 O---O
 O-O-O
 O---O
 OOOOO
 ---
+name: Test Map 2
+material: classic
+monsters: 2
+speedModifier: 1.5
 OOOOO
 O-O-O
 O---O
 O-O-O
 OOOOO
 ---
+name: Test Map 3
+material: classic
+monsters: 3
+speedModifier: 0.8
 OOOOO
 O---O
 O-O-O
 O-O-O
 OOOOO
-
