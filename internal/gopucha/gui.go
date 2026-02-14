@@ -82,7 +82,7 @@ func RunGUIGame(mapFile string) error {
 	guiGame := &GUIGame{
 		app:          app.New(),
 		blockSize:    defaultBlockSize,
-		tickInterval: 260 * time.Millisecond,
+		tickInterval: 340 * time.Millisecond,
 		mapFile:      mapFile,
 		state:        StateSettings,
 	}
@@ -105,14 +105,23 @@ func (g *GUIGame) showSettings() {
 	}
 
 	// Speed slider
-	speedLabel := widget.NewLabel("Game Speed:")
+	speedLabel := widget.NewLabel("Speed:")
 	speedValue := binding.NewFloat()
-	speedValue.Set(float64(g.tickInterval.Milliseconds()))
+	// Invert: slider value 550 - tickInterval in ms
+	invertedSpeed := 550 - g.tickInterval.Milliseconds()
+	speedValue.Set(float64(invertedSpeed))
 
 	speedSlider := widget.NewSliderWithData(50, 500, speedValue)
 	speedSlider.Step = 50
 
-	speedDisplay := widget.NewLabelWithData(binding.FloatToStringWithFormat(speedValue, "%.0f ms"))
+	// Display shows actual milliseconds, inverted from slider
+	speedDisplay := widget.NewLabelWithData(binding.NewDataListener(
+		func() (string, error) {
+			val, _ := speedValue.Get()
+			actualMs := 550 - int64(val)
+			return fmt.Sprintf("%d ms (slower <- faster)", actualMs), nil
+		},
+	))
 
 	// Map file selection
 	mapFiles := g.findMapFiles()
@@ -138,7 +147,9 @@ func (g *GUIGame) showSettings() {
 	dialog.ShowCustomConfirm("Settings", "Apply", "Cancel", content, func(apply bool) {
 		if apply {
 			speed, _ := speedValue.Get()
-			g.tickInterval = time.Duration(speed) * time.Millisecond
+			// Invert the slider value: 550 - sliderValue = actual milliseconds
+			actualMs := 550 - int64(speed)
+			g.tickInterval = time.Duration(actualMs) * time.Millisecond
 			if selected := mapSelect.Selected; selected != "" {
 				g.mapFile = selected
 			}

@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/sjiamnocna/gopucha"
+	"github.com/sjiamnocna/gopucha/internal/gopucha"
 )
 
 func main() {
