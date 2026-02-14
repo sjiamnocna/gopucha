@@ -27,12 +27,12 @@ import (
 )
 
 const (
-	defaultBlockSize = 20
-	minBlockSize     = 10
-	maxBlockSize     = 50
-	minWindowSize    = 640
-	statusBarHeight  = 80
-	defaultTickInterval = 220 * time.Millisecond
+	defaultBlockSize          = 20
+	minBlockSize              = 10
+	maxBlockSize              = 50
+	minWindowSize             = 640
+	statusBarHeight           = 80
+	defaultTickInterval       = 220 * time.Millisecond
 	monsterTeethBlinkInterval = 150 * time.Millisecond
 )
 
@@ -48,28 +48,28 @@ const (
 )
 
 type GUIGame struct {
-	app             fyne.App
-	window          fyne.Window
-	game            *gameplay.Game
-	blockSize       float32
-	offsetX         float32 // X offset for centering the game
-	offsetY         float32 // Y offset for centering the game
-	canvas          *fyne.Container
-	keyCatcher      *keyCatcher
-	ticker          *time.Ticker
-	tickInterval    time.Duration
-	mapFile         string
-	infoLabel       *widget.Label
-	controlsLabel   *widget.Label
-	state           GameState
-	countdownTicks  int
-	pauseTicks      int
-	tickerDone      chan bool
-	mouthOpen       bool
-	mouthOpenRatio  float64
-	mouthAnimDir    int
-	mouthTicker     *time.Ticker
-	disableMonsters bool
+	app                   fyne.App
+	window                fyne.Window
+	game                  *gameplay.Game
+	blockSize             float32
+	offsetX               float32 // X offset for centering the game
+	offsetY               float32 // Y offset for centering the game
+	canvas                *fyne.Container
+	keyCatcher            *keyCatcher
+	ticker                *time.Ticker
+	tickInterval          time.Duration
+	mapFile               string
+	infoLabel             *widget.Label
+	controlsLabel         *widget.Label
+	state                 GameState
+	countdownTicks        int
+	pauseTicks            int
+	tickerDone            chan bool
+	mouthOpen             bool
+	mouthOpenRatio        float64
+	mouthAnimDir          int
+	mouthTicker           *time.Ticker
+	disableMonsters       bool
 	monsterTeethBlink     bool
 	monsterTeethBlinkLast time.Time
 }
@@ -426,7 +426,7 @@ func (g *GUIGame) setupGameUI() {
 		lastHeight := float32(0)
 		ticker := time.NewTicker(200 * time.Millisecond)
 		defer ticker.Stop()
-		
+
 		for range ticker.C {
 			if g.window == nil || g.window.Canvas() == nil {
 				continue

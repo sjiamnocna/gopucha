@@ -38,14 +38,24 @@ jobs:
       - name: Install Linux deps
         if: matrix.os == 'ubuntu-latest'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential pkg-config libgl1-mesa-dev xorg-dev \
-            libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev
+          for i in 1 2 3; do
+            sudo apt-get update && sudo apt-get install -y --no-install-recommends \
+              build-essential pkg-config libgl1-mesa-dev xorg-dev \
+              libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev && break
+            if [ "$i" -eq 3 ]; then
+              exit 1
+            fi
+            sleep 10
+          done
 
       - name: Go fmt check
         run: |
-          test -z "$(gofmt -l .)"
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "Unformatted files:"
+            echo "$unformatted"
+            exit 1
+          fi
         shell: bash
 
       - name: Build
