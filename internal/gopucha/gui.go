@@ -6,6 +6,7 @@ package gopucha
 import (
 	"fmt"
 	"image/color"
+	"math"
 	"os"
 	"path/filepath"
 	"time"
@@ -48,6 +49,11 @@ type GUIGame struct {
 	state        GameState
 	countdownTicks int
 	tickerDone    chan bool
+	mouthOpen     bool
+	mouthOpenRatio float64
+	mouthAnimDir   int
+	mouthTicker    *time.Ticker
+	disableMonsters bool
 }
 
 type keyCatcher struct {
@@ -78,13 +84,14 @@ func (k *keyCatcher) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(bg)
 }
 
-func RunGUIGame(mapFile string) error {
+func RunGUIGame(mapFile string, disableMonsters bool) error {
 	guiGame := &GUIGame{
 		app:          app.New(),
 		blockSize:    defaultBlockSize,
 		tickInterval: 340 * time.Millisecond,
 		mapFile:      mapFile,
 		state:        StateSettings,
+		disableMonsters: disableMonsters,
 	}
 
 	guiGame.window = guiGame.app.NewWindow("Gopucha - Pac-Man Game")
@@ -115,13 +122,12 @@ func (g *GUIGame) showSettings() {
 	speedSlider.Step = 50
 
 	// Display shows actual milliseconds, inverted from slider
-	speedDisplay := widget.NewLabelWithData(binding.NewDataListener(
-		func() (string, error) {
-			val, _ := speedValue.Get()
-			actualMs := 550 - int64(val)
-			return fmt.Sprintf("%d ms (slower <- faster)", actualMs), nil
-		},
-	))
+	speedDisplay := widget.NewLabel("")
+	speedValue.AddListener(binding.NewDataListener(func() {
+		val, _ := speedValue.Get()
+		actualMs := 550 - int64(val)
+		speedDisplay.SetText(fmt.Sprintf("%d ms (slower ← faster)", actualMs))
+	}))
 
 	// Map file selection
 	mapFiles := g.findMapFiles()
@@ -222,6 +228,10 @@ func (g *GUIGame) startGame() {
 			}
 		}
 	}
+	if g.mouthTicker != nil {
+		g.mouthTicker.Stop()
+		g.mouthTicker = nil
+	}
 
 	if g.mapFile == "" {
 		mapFiles := g.findMapFiles()
@@ -242,7 +252,7 @@ func (g *GUIGame) startGame() {
 		return
 	}
 
-	g.game = NewGame(maps)
+	g.game = NewGame(maps, g.disableMonsters)
 	if g.game == nil {
 		dialog.ShowError(fmt.Errorf("failed to create game"), g.window)
 		return
@@ -250,6 +260,9 @@ func (g *GUIGame) startGame() {
 
 	g.state = StatePlaying
 	g.countdownTicks = 5
+	g.mouthOpen = false
+	g.mouthOpenRatio = 0
+	g.mouthAnimDir = 0
 	g.setupGameUI()
 	g.startGameLoop()
 	g.initControls()
@@ -344,17 +357,152 @@ func (g *GUIGame) renderGame(infoLabel *widget.Label) {
 		g.canvas.Add(rect)
 	}
 
-	// Render player (yellow circle)
-	circle := canvas.NewCircle(color.RGBA{255, 255, 0, 255})
-	circle.Resize(fyne.NewSize(g.blockSize*0.9, g.blockSize*0.9))
-	circle.Move(fyne.NewPos(float32(g.game.Player.X)*g.blockSize+g.blockSize*0.05, float32(g.game.Player.Y)*g.blockSize+g.blockSize*0.05))
-	g.canvas.Add(circle)
+	// Render player (yellow semi-circle with mouth)
+	g.drawPacman(float32(g.game.Player.X)*g.blockSize+g.blockSize*0.05, float32(g.game.Player.Y)*g.blockSize+g.blockSize*0.05, g.blockSize*0.9, g.game.Player.Direction)
 
 	// Update info
 	infoLabel.SetText(fmt.Sprintf("Level: %d | Score: %d | Lives: %d | Dots: %d | MapSize: %dx%d",
 		g.game.CurrentLevel+1, g.game.Score, g.game.Lives, g.game.CurrentMap.CountDots(), m.Width, m.Height))
 
 	g.canvas.Refresh()
+}
+
+func (g *GUIGame) drawPacman(x, y, size float32, dir Direction) {
+	// Draw the Pac-Man circle with mouth cutout
+	// We'll draw filled arcs by creating many small filled rectangles
+	
+	centerX := float64(x + size/2)
+	centerY := float64(y + size/2)
+	radius := float64(size / 2)
+	
+	// Mouth opening angle: 45 degrees on each side = 90 degrees total opening
+	mouthHalfAngle := math.Pi / 4 // 45 degrees
+	
+	// Default mouth position (no rotation offset)
+	defaultMouthAngle := 0.0
+	
+	// Screen coordinates: 0° = right, 90° = down, 180° = left, 270° = up
+	var directionAngle float64
+	switch dir {
+	case Right:
+		directionAngle = 0
+	case Down:
+		directionAngle = math.Pi / 2
+	case Left:
+		directionAngle = math.Pi
+	case Up:
+		directionAngle = 3 * math.Pi / 2
+	}
+	
+	// Mouth center = default position + direction angle
+	mouthCenterAngle := defaultMouthAngle + directionAngle
+	
+	effectiveHalfAngle := mouthHalfAngle * g.mouthOpenRatio
+	mouthStartAngle := mouthCenterAngle - effectiveHalfAngle
+	mouthEndAngle := mouthCenterAngle + effectiveHalfAngle
+	
+	// Draw Pac-Man as filled circle with mouth opening
+	// We'll draw filled wedges/sectors except for the mouth area
+	step := 1.0 // degrees per iteration
+	for i := -180; i < 180; i += int(step) {
+		angle := float64(i) * math.Pi / 180.0
+		
+		// Check if this angle is within the mouth opening (with wrap-around)
+		if g.mouthOpenRatio > 0 && g.angleInRange(angle, mouthStartAngle, mouthEndAngle) {
+			continue // Skip mouth area
+		}
+		
+		// Draw small filled rectangle to form the circle
+		thickness := 1.5
+		for dist := 0.0; dist < radius; dist += thickness {
+			// Point along the radial line
+			px := centerX + (dist/radius)*radius*math.Cos(angle)
+			py := centerY + (dist/radius)*radius*math.Sin(angle)
+			
+			pixel := canvas.NewRectangle(color.RGBA{255, 255, 0, 255}) // Yellow
+			pixel.Resize(fyne.NewSize(float32(thickness), float32(thickness)))
+			pixel.Move(fyne.NewPos(float32(px-thickness/2), float32(py-thickness/2)))
+			g.canvas.Add(pixel)
+		}
+	}
+}
+
+func (g *GUIGame) angleInRange(angle, start, end float64) bool {
+	// Normalize angles to (-pi, pi]
+	norm := func(a float64) float64 {
+		for a <= -math.Pi {
+			a += 2 * math.Pi
+		}
+		for a > math.Pi {
+			a -= 2 * math.Pi
+		}
+		return a
+	}
+
+	a := norm(angle)
+	s := norm(start)
+	e := norm(end)
+
+	if s <= e {
+		return a >= s && a <= e
+	}
+	// Wrap-around case
+	return a >= s || a <= e
+}
+
+func (g *GUIGame) startMouthAnimation() {
+	// Reset animation state
+	g.mouthOpenRatio = 0
+	g.mouthAnimDir = 1
+	if g.mouthTicker != nil {
+		return
+	}
+
+	// Run smooth open/close within a single game tick
+	interval := g.tickInterval / 8
+	if interval < 25*time.Millisecond {
+		interval = 25 * time.Millisecond
+	}
+
+	g.mouthTicker = time.NewTicker(interval)
+	go func() {
+		for range g.mouthTicker.C {
+			if g.mouthAnimDir == 0 {
+				g.mouthTicker.Stop()
+				g.mouthTicker = nil
+				return
+			}
+
+			// Step size for smoother animation
+			step := 0.25
+			g.mouthOpenRatio += float64(g.mouthAnimDir) * step
+			if g.mouthOpenRatio >= 1 {
+				g.mouthOpenRatio = 1
+				g.mouthAnimDir = -1
+			} else if g.mouthOpenRatio <= 0 {
+				g.mouthOpenRatio = 0
+				g.mouthAnimDir = 0
+			}
+
+			fyne.DoAndWait(func() {
+				g.renderGame(g.infoLabel)
+			})
+		}
+	}()
+}
+
+func (g *GUIGame) minF(a, b float32) float32 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func (g *GUIGame) maxF(a, b float32) float32 {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func (g *GUIGame) renderGameWithCountdown(infoLabel *widget.Label) {
@@ -425,11 +573,7 @@ func (g *GUIGame) handleKeyPress(ev *fyne.KeyEvent, infoLabel *widget.Label) {
 		return
 	}
 
-	// Ignore movement input during countdown
-	if g.countdownTicks > 0 {
-		return
-	}
-
+	// Allow direction input during countdown to queue movement
 	switch ev.Name {
 	case fyne.KeyUp:
 		g.game.Player.SetDirection(Up)
@@ -443,10 +587,19 @@ func (g *GUIGame) handleKeyPress(ev *fyne.KeyEvent, infoLabel *widget.Label) {
 		g.showSettings()
 	case fyne.KeyEqual, fyne.KeyPlus:
 		// + to zoom in
-		g.zoomIn(infoLabel)
+		if g.countdownTicks == 0 {
+			g.zoomIn(infoLabel)
+		}
 	case fyne.KeyMinus:
 		// - to zoom out
-		g.zoomOut(infoLabel)
+		if g.countdownTicks == 0 {
+			g.zoomOut(infoLabel)
+		}
+	}
+
+	// Ignore other gameplay during countdown
+	if g.countdownTicks > 0 {
+		return
 	}
 }
 
@@ -477,7 +630,9 @@ func (g *GUIGame) startGameLoop() {
 			// Handle countdown phase
 			if g.countdownTicks > 0 {
 				g.countdownTicks--
-				g.renderGameWithCountdown(g.infoLabel)
+				fyne.DoAndWait(func() {
+					g.renderGameWithCountdown(g.infoLabel)
+				})
 				continue
 			}
 
@@ -490,11 +645,24 @@ func (g *GUIGame) startGameLoop() {
 			if g.game.Won {
 				g.ticker.Stop()
 				g.state = StateWon
-				dialog.ShowInformation("You Won!", fmt.Sprintf("Final Score: %d", g.game.Score), g.window)
+				fyne.Do(func() {
+					dialog.ShowInformation("You Won!", fmt.Sprintf("Final Score: %d", g.game.Score), g.window)
+				})
 				return
 			}
 
 			g.game.Update()
+
+			// Mouth animation: smooth open/close on dot eat
+			if g.game.DotEaten {
+				g.startMouthAnimation()
+			}
+
+			// Restart countdown if a life was lost
+			if g.game.LifeLost {
+				g.countdownTicks = 5
+				g.game.LifeLost = false
+			}
 
 			// Auto-advance to next level when all dots eaten
 			if g.game.CurrentMap.CountDots() == 0 {
@@ -502,7 +670,9 @@ func (g *GUIGame) startGameLoop() {
 				g.countdownTicks = 5
 			}
 
-			g.renderGame(g.infoLabel)
+			fyne.DoAndWait(func() {
+				g.renderGame(g.infoLabel)
+			})
 		}
 	}()
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,11 +10,14 @@ import (
 )
 
 func main() {
-	// Default to maps directory if no argument provided
-	mapFile := "maps/maps.txt"
+	noMonsters := flag.Bool("no-monsters", false, "disable monster spawning (debug)")
+	mapFlag := flag.String("map", "maps/maps.txt", "path to map file")
+	flag.Parse()
 
-	if len(os.Args) >= 2 {
-		mapFile = os.Args[1]
+	// Default to maps directory if no argument provided
+	mapFile := *mapFlag
+	if flag.NArg() >= 1 {
+		mapFile = flag.Arg(0)
 	}
 
 	// If the path doesn't exist and doesn't contain a directory separator,
@@ -26,7 +30,7 @@ func main() {
 	}
 
 	// Run GUI game only
-	err := gopucha.RunGUIGame(mapFile)
+	err := gopucha.RunGUIGame(mapFile, *noMonsters)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

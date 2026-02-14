@@ -24,6 +24,12 @@ BUILD_FLAGS := -ldflags="-s -w" -trimpath
 build: $(BIN_DIR)
 	$(GO) build -o "$(BIN_PATH)" ./cmd/$(APP_NAME)
 
+run: build
+	./$(BIN_PATH)
+
+dev:
+	$(GO) run ./cmd/$(APP_NAME) -no-monsters
+
 # Optimized build with size reduction flags
 build-optimized: $(BIN_DIR)
 	$(GO) build $(BUILD_FLAGS) -o "$(BIN_PATH)" ./cmd/$(APP_NAME)
