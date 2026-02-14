@@ -4,24 +4,20 @@ Golang Zoner Pampuch reimplemented to Golang with custom maps.
 
 ## Description
 
-Gopucha is a Pac-Man-like game where a semi-circle figure moves around eating dots while avoiding monsters (red squares). The game supports custom maps loaded from text files and offers both terminal and GUI modes.
+Gopucha is based on the Czech original Pampuch, where a semi-circle figure moves around eating dots while avoiding monsters (red squares). The game supports custom maps loaded from text files and runs in GUI mode.
 
 ## Features
 
-- **Dual Mode**: Terminal-based or GUI mode (with Fyne)
+- **GUI Mode**: Fyne-based interface
 - **Custom Map Loading**: Load maps from TXT files
 - **Map Generator**: Generate random coherent maps
 - **Multiple Levels**: Separated by `---` in map files (all maps must have same dimensions)
-- **GUI Features** (when using `-gui` flag):
+- **GUI Features**:
   - Pre-game settings: adjust speed, select map
   - Arrow key controls
   - Zoom in/out with +/- keys or CTRL+Scroll
   - Visual graphics with colored blocks
-- **Terminal Mode** (default):
-  - WASD controls
-  - ANSI color output
-  - Fast and lightweight
-- **4 Monsters**: Red squares that move and turn at edges
+- **4 Monsters**: Red squares that turn only when hitting walls and pick the shortest available path toward the Pampuch figure
 - **Score Tracking**: Earn points for collecting dots
 - **Progressive Difficulty**: Multiple levels with increasing challenge
 
@@ -56,30 +52,42 @@ OOOOOOOOOOOOOOOOOOOOOOOO
 
 ## Installation
 
-### Terminal Mode (default)
+### Dependencies
+- **Go**: Install Go 1.26+ and ensure `go` is on your PATH. Builds are done directly with Go (no Docker).
+- **System libs for GUI mode** (Linux):
+  - Ubuntu/Debian: `sudo apt-get install libgl1-mesa-dev xorg-dev`
+  - Fedora: `sudo dnf install mesa-libGL-devel libXcursor-devel libXrandr-devel libXinerama-devel libXi-devel libXxf86vm-devel`
+  - Arch: `sudo pacman -S mesa libxcursor libxrandr libxinerama libxi`
+
+### Build (Makefile - preferred)
+```bash
+make build           # Standard build (GUI mode)
+make build-optimized # Optimized build with size reduction
+make test            # Run unit tests
+```
+
+### Run
+```bash
+make run             # Build and run with default map
+./gopucha            # Run manually (default maps)
+./gopucha maps/maps.txt
+```
+
+### Build (manual - fallback)
 ```bash
 go build -o gopucha ./cmd/gopucha
 ```
 
-### GUI Mode (requires X11/display libraries)
+### Build (manual)
 ```bash
-# Install system dependencies first (Ubuntu/Debian):
-# sudo apt-get install libgl1-mesa-dev xorg-dev
-
-go build -tags gui -o gopucha ./cmd/gopucha
-```
-
-### Using Makefile
-```bash
-make build           # Standard build (terminal mode)
-make build-optimized # Optimized build with size reduction
-make test            # Run unit tests
-make run             # Build and run with default map
+go build -o gopucha ./cmd/gopucha
 ```
 
 ## Usage
 
-### Terminal Mode (default)
+### GUI
+GUI is made with Fyne and is the default mode.
+
 Run with default maps:
 ```bash
 ./gopucha
@@ -89,13 +97,6 @@ Run with a specific map file:
 ```bash
 ./gopucha maps/maps.txt
 ./gopucha simple.txt  # Automatically looks in maps/ directory
-```
-
-### GUI Mode
-Run with GUI (requires display server):
-```bash
-./gopucha -gui
-./gopucha -gui maps/maps.txt
 ```
 
 GUI mode features:
@@ -120,14 +121,6 @@ Options:
 
 ## Controls
 
-### Terminal Mode
-- `W`: Move up
-- `S`: Move down
-- `A`: Move left
-- `D`: Move right
-- `Q`: Quit game
-- Press Enter after each command
-
 ### GUI Mode
 - `Arrow Keys`: Move player
 - `+/-`: Zoom in/out
@@ -137,7 +130,7 @@ Options:
 
 - Collect all dots to advance to the next level
 - Avoid the monsters (red squares)
-- Monsters can only turn when they reach edges or intersections
+- Monsters only turn when they hit a wall, then choose the shortest available path toward the Pampuch figure
 - Game ends when you collide with a monster
 - Win by completing all levels
 

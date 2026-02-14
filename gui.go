@@ -31,10 +31,41 @@ type GUIGame struct {
 	game         *Game
 	blockSize    float32
 	canvas       *fyne.Container
+	keyCatcher   *keyCatcher
 	ticker       *time.Ticker
 	tickInterval time.Duration
 	gameStarted  bool
 	mapFile      string
+	infoLabel    *widget.Label
+	gameOverFlag bool
+}
+
+type keyCatcher struct {
+	widget.BaseWidget
+	onKey func(*fyne.KeyEvent)
+}
+
+func newKeyCatcher(onKey func(*fyne.KeyEvent)) *keyCatcher {
+	k := &keyCatcher{onKey: onKey}
+	k.ExtendBaseWidget(k)
+	return k
+}
+
+func (k *keyCatcher) FocusGained() {}
+
+func (k *keyCatcher) FocusLost() {}
+
+func (k *keyCatcher) TypedKey(ev *fyne.KeyEvent) {
+	if k.onKey != nil {
+		k.onKey(ev)
+	}
+}
+
+func (k *keyCatcher) TypedRune(r rune) {}
+
+func (k *keyCatcher) CreateRenderer() fyne.WidgetRenderer {
+	bg := canvas.NewRectangle(color.Transparent)
+	return widget.NewSimpleRenderer(bg)
 }
 
 func RunGUIGame(mapFile string) error {
@@ -168,29 +199,36 @@ func (g *GUIGame) setupGameUI() {
 	g.canvas = container.NewWithoutLayout()
 
 	// Info panel
-	infoLabel := widget.NewLabel(fmt.Sprintf("Level: %d | Score: %d | Dots: %d",
+	g.infoLabel = widget.NewLabel(fmt.Sprintf("Level: %d | Score: %d | Dots: %d",
 		g.game.CurrentLevel+1, g.game.Score, g.game.CurrentMap.CountDots()))
 
-	controls := widget.NewLabel("Controls: Arrow Keys to move | +/- to zoom | ESC to quit")
+	controls := widget.NewLabel("Controls: Arrow Keys to move | +/- to zoom | N for new game | ESC to quit")
 
-	topBar := container.NewVBox(infoLabel, controls)
+	topBar := container.NewVBox(g.infoLabel, controls)
 
 	// Main container with scroll
 	scroll := container.NewScroll(g.canvas)
-	content := container.NewBorder(topBar, nil, nil, nil, scroll)
+
+	// Key capture overlay to ensure arrow keys are received reliably
+	g.keyCatcher = newKeyCatcher(func(ev *fyne.KeyEvent) {
+		g.handleKeyPress(ev, g.infoLabel)
+	})
+	gameArea := container.NewStack(scroll, g.keyCatcher)
+
+	content := container.NewBorder(topBar, nil, nil, nil, gameArea)
 
 	g.window.SetContent(content)
 
-	// Set up keyboard handler
-	g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
-		g.handleKeyPress(ev, infoLabel)
-	})
+	// Focus key catcher so arrow keys (including Up) are not swallowed by scroll
+	g.window.Canvas().Focus(g.keyCatcher)
 
 	// Set up mouse scroll for zoom (CTRL+Scroll)
 	// Note: Fyne doesn't directly support scroll events, so we'll rely on keyboard shortcuts
 
 	// Render initial state
-	g.renderGame(infoLabel)
+	g.gameOverFlag = false
+	g.renderGame(g.infoLabel)
+	g.calculateBlockSize()
 }
 
 func (g *GUIGame) renderGame(infoLabel *widget.Label) {
@@ -201,6 +239,11 @@ func (g *GUIGame) renderGame(infoLabel *widget.Label) {
 	g.canvas.Objects = nil
 
 	m := g.game.CurrentMap
+	
+	// Calculate canvas dimensions
+	canvasWidth := float32(m.Width) * g.blockSize
+	canvasHeight := float32(m.Height) * g.blockSize
+	g.canvas.Resize(fyne.NewSize(canvasWidth, canvasHeight))
 
 	// Render cells
 	for y := 0; y < m.Height; y++ {
@@ -239,13 +282,68 @@ func (g *GUIGame) renderGame(infoLabel *widget.Label) {
 	g.canvas.Add(circle)
 
 	// Update info
-	infoLabel.SetText(fmt.Sprintf("Level: %d | Score: %d | Dots: %d",
-		g.game.CurrentLevel+1, g.game.Score, g.game.CurrentMap.CountDots()))
+	infoLabel.SetText(fmt.Sprintf("Level: %d | Score: %d | Dots: %d | MapSize: %dx%d",
+		g.game.CurrentLevel+1, g.game.Score, g.game.CurrentMap.CountDots(), m.Width, m.Height))
 
 	g.canvas.Refresh()
 }
 
+func (g *GUIGame) calculateBlockSize() {
+	if g.game == nil || g.game.CurrentMap == nil {
+		return
+	}
+	
+	m := g.game.CurrentMap
+	canvasSize := g.window.Canvas().Size()
+	
+	// Account for UI elements (roughly 100 pixels for top bar)
+	availHeight := canvasSize.Height - 100
+	availWidth := canvasSize.Width
+	
+	blockSizeByHeight := availHeight / float32(m.Height)
+	blockSizeByWidth := availWidth / float32(m.Width)
+	
+	// Use the smaller to fit in window
+	g.blockSize = blockSizeByHeight
+	if blockSizeByWidth < blockSizeByHeight {
+		g.blockSize = blockSizeByWidth
+	}
+	
+	// Clamp to reasonable range
+	if g.blockSize < minBlockSize {
+		g.blockSize = minBlockSize
+	}
+	if g.blockSize > maxBlockSize {
+		g.blockSize = maxBlockSize
+	}
+}
+
 func (g *GUIGame) handleKeyPress(ev *fyne.KeyEvent, infoLabel *widget.Label) {
+	// Handle N for new game
+	if ev.Name == fyne.KeyN {
+		if g.ticker != nil {
+			g.ticker.Stop()
+		}
+		g.gameStarted = false
+		g.gameOverFlag = false
+		g.showSettings()
+		return
+	}
+
+	// Handle arrow keys after game over to restart
+	if g.gameOverFlag {
+		switch ev.Name {
+		case fyne.KeyUp, fyne.KeyDown, fyne.KeyLeft, fyne.KeyRight:
+			if g.ticker != nil {
+				g.ticker.Stop()
+			}
+			g.gameStarted = false
+			g.gameOverFlag = false
+			g.showSettings()
+			return
+		}
+	}
+
 	if !g.gameStarted || g.game == nil {
 		return
 	}
@@ -288,25 +386,24 @@ func (g *GUIGame) startGameLoop() {
 	g.ticker = time.NewTicker(g.tickInterval)
 
 	go func() {
-		infoLabel := widget.NewLabel("")
 		for range g.ticker.C {
 			if g.game.GameOver || g.game.Won {
 				g.ticker.Stop()
+				g.gameOverFlag = true
 
 				var msg string
 				if g.game.GameOver {
-					msg = "Game Over!"
+					msg = "Game Over! Press any arrow key to play again."
 				} else {
-					msg = fmt.Sprintf("You Won! Final Score: %d", g.game.Score)
+					msg = fmt.Sprintf("You Won! Final Score: %d. Press any arrow key to play again.", g.game.Score)
 				}
 
 				dialog.ShowInformation("Game Ended", msg, g.window)
-				g.gameStarted = false
 				return
 			}
 
 			g.game.Update()
-			g.renderGame(infoLabel)
+			g.renderGame(g.infoLabel)
 		}
 	}()
 }
