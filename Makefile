@@ -23,17 +23,17 @@ BUILD_FLAGS := -ldflags="-s -w" -trimpath
 .PHONY: build build-optimized run dev test clean mapgen-build mapgen
 
 # Standard build
-build: $(BIN_DIR)
+build-dev: $(BIN_DIR)
 	$(GO) build -o "$(BIN_PATH)" ./cmd/$(APP_NAME)
 
-run: build
+run: build-dev
 	./$(BIN_PATH)
 
 dev:
 	$(GO) run ./cmd/$(APP_NAME)
 
 # Optimized build with size reduction flags
-build-optimized: $(BIN_DIR)
+build: $(BIN_DIR)
 	$(GO) build $(BUILD_FLAGS) -o "$(BIN_PATH)" ./cmd/$(APP_NAME)
 
 # Run unit tests
@@ -42,14 +42,6 @@ test:
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
-
-# Build mapgen tool
-mapgen-build: $(BIN_DIR)
-	$(GO) build -o "$(MAPGEN_BIN)" ./cmd/mapgen
-
-# Generate random maps with default dimensions (24x10)
-mapgen: mapgen-build
-	$(MAPGEN_BIN) -width 24 -height 10 -levels 3 -output $(MAPS_DIR)/generated_map.txt
 
 clean:
 	rm -rf $(BIN_DIR)
