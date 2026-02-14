@@ -17,14 +17,14 @@ const (
 )
 
 type Map struct {
-	Width        int
-	Height       int
-	Cells        [][]Cell
-	Name         string
-	Material     string
-	MonsterCount int
+	Width         int
+	Height        int
+	Cells         [][]Cell
+	Name          string
+	Material      string
+	MonsterCount  int
 	SpeedModifier float64
-	PlayerStart  *StartPos
+	PlayerStart   *StartPos
 	MonsterStarts []StartPos
 }
 
@@ -43,10 +43,10 @@ func LoadMapsFromFile(filename string) ([]Map, error) {
 	var maps []Map
 	var currentLines []string
 	scanner := bufio.NewScanner(file)
-	
+
 	for scanner.Scan() {
 		line := scanner.Text()
-		
+
 		// Check for level separator
 		if line == "---" {
 			if len(currentLines) > 0 {
@@ -62,12 +62,12 @@ func LoadMapsFromFile(filename string) ([]Map, error) {
 			}
 			continue
 		}
-		
+
 		if line != "" {
 			currentLines = append(currentLines, line)
 		}
 	}
-	
+
 	// Don't forget the last map
 	if len(currentLines) > 0 {
 		m, err := parseMap(currentLines)
@@ -79,23 +79,23 @@ func LoadMapsFromFile(filename string) ([]Map, error) {
 		}
 		maps = append(maps, m)
 	}
-	
+
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
-	
+
 	// Validate that all maps have the same dimensions
 	if len(maps) > 1 {
 		firstWidth := maps[0].Width
 		firstHeight := maps[0].Height
 		for i, m := range maps[1:] {
 			if m.Width != firstWidth || m.Height != firstHeight {
-				return nil, fmt.Errorf("map %d has different dimensions (%dx%d) than first map (%dx%d). All maps in a file must have the same dimensions", 
+				return nil, fmt.Errorf("map %d has different dimensions (%dx%d) than first map (%dx%d). All maps in a file must have the same dimensions",
 					i+2, m.Width, m.Height, firstWidth, firstHeight)
 			}
 		}
 	}
-	
+
 	return maps, nil
 }
 
@@ -128,6 +128,8 @@ func parseMap(lines []string) (Map, error) {
 	speedModifier := 1.0
 	var playerStart *StartPos
 	var monsterStarts []StartPos
+	var gridPlayerStart *StartPos
+	var gridMonsterStarts []StartPos
 	var gridLines []string
 
 	for _, line := range lines {
@@ -135,12 +137,12 @@ func parseMap(lines []string) (Map, error) {
 		if trimmed == "" {
 			continue
 		}
-		
+
 		// Check if this looks like a metadata line
 		if strings.Contains(trimmed, ":") || strings.Contains(trimmed, "=") {
 			key, value := parseMapMetaLine(trimmed)
 			key = strings.ToLower(key)
-			
+
 			switch key {
 			case "name":
 				name = value
@@ -179,7 +181,7 @@ func parseMap(lines []string) (Map, error) {
 				continue
 			}
 		}
-		
+
 		// If we get here, treat it as grid data
 		gridLines = append(gridLines, trimmed)
 	}
@@ -211,10 +213,29 @@ func parseMap(lines []string) (Map, error) {
 				cells[y][x] = Wall
 			case '-':
 				cells[y][x] = Dot
+			case 'P':
+				if gridPlayerStart != nil {
+					return Map{}, fmt.Errorf("multiple player starts found")
+				}
+				pos := StartPos{X: x, Y: y}
+				gridPlayerStart = &pos
+				cells[y][x] = Empty
+			case 'M':
+				gridMonsterStarts = append(gridMonsterStarts, StartPos{X: x, Y: y})
+				cells[y][x] = Empty
 			default:
 				cells[y][x] = Empty
 			}
 		}
+	}
+
+	if gridPlayerStart != nil {
+		playerStart = gridPlayerStart
+	}
+	if len(gridMonsterStarts) > 0 {
+		monsterStarts = gridMonsterStarts
+		monsterCount = len(gridMonsterStarts)
+		monsterCountSet = true
 	}
 
 	return Map{
@@ -311,7 +332,6 @@ func validateMap(m *Map) error {
 		}
 		used[key] = true
 	}
-
 
 	dotCount := 0
 	dotStartX, dotStartY := -1, -1
@@ -418,7 +438,7 @@ func (m *Map) CountDots() int {
 
 func (m *Map) Render(playerX, playerY int, monsters []Monster) {
 	fmt.Print("\033[H\033[2J") // Clear screen
-	
+
 	for y := 0; y < m.Height; y++ {
 		for x := 0; x < m.Width; x++ {
 			// Check if player is at this position
@@ -426,7 +446,7 @@ func (m *Map) Render(playerX, playerY int, monsters []Monster) {
 				fmt.Print("\033[33mC\033[0m") // Yellow C (Pac-Man)
 				continue
 			}
-			
+
 			// Check if any monster is at this position
 			isMonster := false
 			for _, monster := range monsters {
@@ -439,7 +459,7 @@ func (m *Map) Render(playerX, playerY int, monsters []Monster) {
 			if isMonster {
 				continue
 			}
-			
+
 			// Render the cell
 			switch m.Cells[y][x] {
 			case Wall:

@@ -1,7 +1,5 @@
 package gopucha
 
-
-
 type Monster struct {
 	X         int
 	Y         int

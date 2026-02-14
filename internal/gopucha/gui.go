@@ -39,25 +39,25 @@ const (
 )
 
 type GUIGame struct {
-	app          fyne.App
-	window       fyne.Window
-	game         *Game
-	blockSize    float32
-	canvas       *fyne.Container
-	keyCatcher   *keyCatcher
-	ticker       *time.Ticker
-	tickInterval time.Duration
-	mapFile      string
-	infoLabel    *widget.Label
-	controlsLabel *widget.Label
-	state        GameState
-	countdownTicks int
-	pauseTicks     int
-	tickerDone    chan bool
-	mouthOpen     bool
-	mouthOpenRatio float64
-	mouthAnimDir   int
-	mouthTicker    *time.Ticker
+	app             fyne.App
+	window          fyne.Window
+	game            *Game
+	blockSize       float32
+	canvas          *fyne.Container
+	keyCatcher      *keyCatcher
+	ticker          *time.Ticker
+	tickInterval    time.Duration
+	mapFile         string
+	infoLabel       *widget.Label
+	controlsLabel   *widget.Label
+	state           GameState
+	countdownTicks  int
+	pauseTicks      int
+	tickerDone      chan bool
+	mouthOpen       bool
+	mouthOpenRatio  float64
+	mouthAnimDir    int
+	mouthTicker     *time.Ticker
 	disableMonsters bool
 }
 
@@ -96,11 +96,11 @@ func (k *keyCatcher) CreateRenderer() fyne.WidgetRenderer {
 
 func RunGUIGame(mapFile string, disableMonsters bool) error {
 	guiGame := &GUIGame{
-		app:          app.New(),
-		blockSize:    defaultBlockSize,
-		tickInterval: 260 * time.Millisecond,
-		mapFile:      mapFile,
-		state:        StateSettings,
+		app:             app.New(),
+		blockSize:       defaultBlockSize,
+		tickInterval:    260 * time.Millisecond,
+		mapFile:         mapFile,
+		state:           StateSettings,
 		disableMonsters: disableMonsters,
 	}
 
@@ -160,7 +160,12 @@ func (g *GUIGame) showSettings() {
 		mapSelect,
 	)
 
-	dialog.ShowCustomConfirm("Settings", "Apply", "Cancel", content, func(apply bool) {
+	closed := false
+	handleClose := func(apply bool) {
+		if closed {
+			return
+		}
+		closed = true
 		if apply {
 			speed, _ := speedValue.Get()
 			// Invert the slider value: 550 - sliderValue = actual milliseconds
@@ -198,7 +203,24 @@ func (g *GUIGame) showSettings() {
 				g.window.Canvas().Focus(g.keyCatcher)
 			}
 		}
+	}
+
+	var d *dialog.ConfirmDialog
+	key := newKeyCatcher(func(ev *fyne.KeyEvent) {
+		if ev.Name == fyne.KeyEscape {
+			handleClose(false)
+			if d != nil {
+				d.Hide()
+			}
+		}
+	})
+	stack := container.NewStack(content, key)
+
+	d = dialog.NewCustomConfirm("Settings", "Apply", "Cancel", stack, func(apply bool) {
+		handleClose(apply)
 	}, g.window)
+	d.Show()
+	g.window.Canvas().Focus(key)
 }
 
 func (g *GUIGame) findMapFiles() []string {
@@ -312,6 +334,16 @@ func (g *GUIGame) showMapErrorAndClose(err error) {
 	})
 	stack := container.NewStack(content, key)
 
+	if len(mapFiles) <= 1 {
+		d := dialog.NewCustom("Map Error", "Exit", stack, g.window)
+		d.SetOnClosed(func() {
+			g.window.Close()
+		})
+		d.Show()
+		g.window.Canvas().Focus(key)
+		return
+	}
+
 	d := dialog.NewCustomConfirm("Map Error", "Load selected", "Exit", stack, func(apply bool) {
 		if apply {
 			if mapSelect.Selected != "" {
@@ -360,7 +392,7 @@ func (g *GUIGame) setupGameUI() {
 
 	// Focus key catcher so arrow keys (including Up) are not swallowed by scroll
 	g.window.Canvas().Focus(g.keyCatcher)
-	
+
 	// Ensure keyCatcher stays focused
 	g.keyCatcher.Refresh()
 
@@ -448,7 +480,7 @@ func (g *GUIGame) updateControlsVisibility() {
 	if g.controlsLabel == nil {
 		return
 	}
-	
+
 	// Only show controls during countdown/level start
 	if g.state == StateLevelStart && g.countdownTicks > 0 {
 		g.controlsLabel.SetText("Controls: Arrow Keys to move | F2 restart | +/- zoom | ESC settings")
@@ -628,7 +660,7 @@ func (g *GUIGame) animateMovement(infoLabel *widget.Label, startPlayer, endPlaye
 		fyne.DoAndWait(func() {
 			g.renderGameAt(infoLabel, playerPos, monsterPos)
 		})
-		
+
 		// Small sleep between frames
 		if i < steps {
 			time.Sleep(stepDuration)
@@ -639,17 +671,17 @@ func (g *GUIGame) animateMovement(infoLabel *widget.Label, startPlayer, endPlaye
 func (g *GUIGame) drawPacman(x, y, size float32, dir Direction) {
 	// Draw the Pac-Man circle with mouth cutout
 	// We'll draw filled arcs by creating many small filled rectangles
-	
+
 	centerX := float64(x + size/2)
 	centerY := float64(y + size/2)
 	radius := float64(size / 2)
-	
+
 	// Mouth opening angle: 45 degrees on each side = 90 degrees total opening
 	mouthHalfAngle := math.Pi / 4 // 45 degrees
-	
+
 	// Default mouth position (no rotation offset)
 	defaultMouthAngle := 0.0
-	
+
 	// Screen coordinates: 0° = right, 90° = down, 180° = left, 270° = up
 	var directionAngle float64
 	switch dir {
@@ -662,32 +694,32 @@ func (g *GUIGame) drawPacman(x, y, size float32, dir Direction) {
 	case Up:
 		directionAngle = 3 * math.Pi / 2
 	}
-	
+
 	// Mouth center = default position + direction angle
 	mouthCenterAngle := defaultMouthAngle + directionAngle
-	
+
 	effectiveHalfAngle := mouthHalfAngle * g.mouthOpenRatio
 	mouthStartAngle := mouthCenterAngle - effectiveHalfAngle
 	mouthEndAngle := mouthCenterAngle + effectiveHalfAngle
-	
+
 	// Draw Pac-Man as filled circle with mouth opening
 	// We'll draw filled wedges/sectors except for the mouth area
 	step := 1.0 // degrees per iteration
 	for i := -180; i < 180; i += int(step) {
 		angle := float64(i) * math.Pi / 180.0
-		
+
 		// Check if this angle is within the mouth opening (with wrap-around)
 		if g.mouthOpenRatio > 0 && g.angleInRange(angle, mouthStartAngle, mouthEndAngle) {
 			continue // Skip mouth area
 		}
-		
+
 		// Draw small filled rectangle to form the circle
 		thickness := 1.5
 		for dist := 0.0; dist < radius; dist += thickness {
 			// Point along the radial line
 			px := centerX + (dist/radius)*radius*math.Cos(angle)
 			py := centerY + (dist/radius)*radius*math.Sin(angle)
-			
+
 			pixel := canvas.NewRectangle(color.RGBA{255, 255, 0, 255}) // Yellow
 			pixel.Resize(fyne.NewSize(float32(thickness), float32(thickness)))
 			pixel.Move(fyne.NewPos(float32(px-thickness/2), float32(py-thickness/2)))
@@ -803,23 +835,23 @@ func (g *GUIGame) calculateBlockSize() {
 	if g.game == nil || g.game.CurrentMap == nil {
 		return
 	}
-	
+
 	m := g.game.CurrentMap
 	canvasSize := g.window.Canvas().Size()
-	
+
 	// Account for UI elements (roughly 100 pixels for top bar)
 	availHeight := canvasSize.Height - 100
 	availWidth := canvasSize.Width
-	
+
 	blockSizeByHeight := availHeight / float32(m.Height)
 	blockSizeByWidth := availWidth / float32(m.Width)
-	
+
 	// Use the smaller to fit in window
 	g.blockSize = blockSizeByHeight
 	if blockSizeByWidth < blockSizeByHeight {
 		g.blockSize = blockSizeByWidth
 	}
-	
+
 	// Clamp to reasonable range
 	if g.blockSize < minBlockSize {
 		g.blockSize = minBlockSize
@@ -932,7 +964,7 @@ func (g *GUIGame) startGameLoop() {
 		defer func() {
 			g.tickerDone <- true
 		}()
-		
+
 		tickCount := 0
 
 		for range g.ticker.C {
@@ -950,7 +982,7 @@ func (g *GUIGame) startGameLoop() {
 				})
 				return
 			}
-			
+
 			// Periodically ensure keyCatcher has focus
 			tickCount++
 			if tickCount%20 == 0 && g.keyCatcher != nil {
@@ -1029,7 +1061,7 @@ func (g *GUIGame) startGameLoop() {
 			// Check if level is completed
 			if levelCompleted {
 				g.game.LevelCompleted = false
-				
+
 				// Check if all levels are done
 				if g.game.CurrentLevel+1 >= len(g.game.Maps) {
 					g.game.Won = true

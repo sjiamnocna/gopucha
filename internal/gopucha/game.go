@@ -7,20 +7,20 @@ import (
 )
 
 type Game struct {
-	CurrentMap    *Map
-	Maps          []Map
-	CurrentLevel  int
-	Player        *Player
-	Monsters      []Monster
-	GameOver      bool
-	Won           bool
-	Score         int
-	Lives         int
-	LifeLost      bool
-	DisableMonsters bool
-	DotEaten      bool
+	CurrentMap           *Map
+	Maps                 []Map
+	CurrentLevel         int
+	Player               *Player
+	Monsters             []Monster
+	GameOver             bool
+	Won                  bool
+	Score                int
+	Lives                int
+	LifeLost             bool
+	DisableMonsters      bool
+	DotEaten             bool
 	CurrentSpeedModifier float64
-	LevelCompleted bool
+	LevelCompleted       bool
 }
 
 const defaultMinMonsterDistance = 5
@@ -29,15 +29,15 @@ func NewGame(maps []Map, disableMonsters bool) *Game {
 	if len(maps) == 0 {
 		return nil
 	}
-	
+
 	g := &Game{
-		Maps:         maps,
-		CurrentLevel: 0,
-		Score:        0,
-		Lives:        3,
+		Maps:            maps,
+		CurrentLevel:    0,
+		Score:           0,
+		Lives:           3,
 		DisableMonsters: disableMonsters,
 	}
-	
+
 	g.loadLevel(0)
 	return g
 }
@@ -47,7 +47,7 @@ func (g *Game) loadLevel(level int) {
 		g.Won = true
 		return
 	}
-	
+
 	g.CurrentLevel = level
 	g.CurrentMap = &g.Maps[level]
 	g.CurrentSpeedModifier = g.CurrentMap.SpeedModifier
@@ -230,19 +230,19 @@ func (g *Game) Update() {
 	if g.GameOver || g.Won {
 		return
 	}
-	
+
 	// Store monster positions before they move
 	oldMonsterPos := make([][2]int, len(g.Monsters))
 	for i := range g.Monsters {
 		oldMonsterPos[i] = [2]int{g.Monsters[i].X, g.Monsters[i].Y}
 	}
-	
+
 	// Store player position before moving
 	oldPlayerX, oldPlayerY := g.Player.X, g.Player.Y
-	
+
 	// Move player
 	g.Player.Move(g.CurrentMap)
-	
+
 	// Check if player ate a dot
 	if g.CurrentMap.HasDot(g.Player.X, g.Player.Y) {
 		g.CurrentMap.EatDot(g.Player.X, g.Player.Y)
@@ -253,12 +253,12 @@ func (g *Game) Update() {
 	} else {
 		g.DotEaten = false
 	}
-	
+
 	// Move monsters
 	for i := range g.Monsters {
 		g.Monsters[i].Move(g.CurrentMap, g.Player.X, g.Player.Y, g.Monsters)
 	}
-	
+
 	// Check collision with monsters (including position swaps)
 	for i, monster := range g.Monsters {
 		// Same cell collision
@@ -274,7 +274,7 @@ func (g *Game) Update() {
 			}
 			return
 		}
-		
+
 		// Swap collision (player and monster passed through each other)
 		if g.Player.X == oldMonsterPos[i][0] && g.Player.Y == oldMonsterPos[i][1] &&
 			monster.X == oldPlayerX && monster.Y == oldPlayerY {
@@ -290,7 +290,7 @@ func (g *Game) Update() {
 			return
 		}
 	}
-	
+
 	// Check if all dots are eaten
 	if g.CurrentMap.CountDots() == 0 {
 		// Mark level as completed, GUI will handle pause and advance
@@ -302,7 +302,7 @@ func (g *Game) Render() {
 	g.CurrentMap.Render(g.Player.X, g.Player.Y, g.Monsters)
 	fmt.Printf("\nLevel: %d | Score: %d | Dots: %d\n", g.CurrentLevel+1, g.Score, g.CurrentMap.CountDots())
 	fmt.Println("Controls: W=Up, S=Down, A=Left, D=Right, Q=Quit")
-	
+
 	if g.GameOver {
 		fmt.Println("\n\033[31mGAME OVER!\033[0m")
 	}
@@ -315,7 +315,7 @@ func (g *Game) HandleInput(input string) {
 	if len(input) == 0 {
 		return
 	}
-	
+
 	switch input[0] {
 	case 'w', 'W':
 		g.Player.SetDirection(Up)
@@ -335,20 +335,20 @@ func RunGame(mapFile string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load maps: %v", err)
 	}
-	
+
 	if len(maps) == 0 {
 		return fmt.Errorf("no maps found in file")
 	}
-	
+
 	game := NewGame(maps, false)
 	if game == nil {
 		return fmt.Errorf("failed to create game")
 	}
-	
+
 	// Game loop
 	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
-	
+
 	// Input channel
 	inputChan := make(chan string, 10)
 	go func() {
@@ -358,7 +358,7 @@ func RunGame(mapFile string) error {
 			inputChan <- input
 		}
 	}()
-	
+
 	for !game.GameOver && !game.Won {
 		select {
 		case <-ticker.C:
@@ -368,12 +368,12 @@ func RunGame(mapFile string) error {
 			game.HandleInput(input)
 		}
 	}
-	
+
 	// Final render
 	game.Render()
-	
+
 	// Wait a bit before exiting
 	time.Sleep(2 * time.Second)
-	
+
 	return nil
 }

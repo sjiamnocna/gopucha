@@ -33,7 +33,7 @@ func NewPlayer(x, y int) *Player {
 func (p *Player) Move(m *Map) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	// If desired direction is available, turn immediately
 	if p.Desired != p.Direction {
 		dx, dy := directionDelta(p.Desired)
@@ -51,13 +51,13 @@ func (p *Player) Move(m *Map) {
 		p.X = newX
 		p.Y = newY
 	}
-	
+
 }
 
 func (p *Player) SetDirection(d Direction) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	if d == p.Desired {
 		return
 	}

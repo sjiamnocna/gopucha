@@ -66,7 +66,7 @@ func TestGameSpeedModifierScoring(t *testing.T) {
 			}
 
 			if game.CurrentSpeedModifier != tt.speedModifier {
-				t.Errorf("Game CurrentSpeedModifier = %v, want %v", 
+				t.Errorf("Game CurrentSpeedModifier = %v, want %v",
 					game.CurrentSpeedModifier, tt.speedModifier)
 			}
 
@@ -162,7 +162,7 @@ func TestDotScoringWithSpeedModifier(t *testing.T) {
 
 	dotCountAfter := game.CurrentMap.CountDots()
 	if dotCountBefore != dotCountAfter+1 {
-		t.Errorf("Dot count should decrease by 1, was %d now %d", 
+		t.Errorf("Dot count should decrease by 1, was %d now %d",
 			dotCountBefore, dotCountAfter)
 	}
 }
