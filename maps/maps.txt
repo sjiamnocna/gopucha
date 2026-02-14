@@ -14,11 +14,31 @@ OOO------OOO--OOOOO----OOOOOOO
 -------OO-------OO--------OOOO
 ---OOO--OO-----OO-------------
 ---OOO---OOO--OOOOO---------OO
----------------------0000-----
+---------------------OOOO-----
+
+
+---
+name: Pampuch Original (Resized)
+material: purpledots
+monsters: 3
+------------------------------
+--OOOO--OO---OO---OO---OOO----
+--O--O--O----O----O----O-O----
+--OO-O--OO---OO---OO---O-O----
+------OOO----------OOO--------
+--OO--O---O--OOOO--O---O--OO--
+--OO--O---O-----O--O---O--OO--
+--OO--OOOOO--OOOO--OOOOO--OO--
+------O------------OOO--------
+--OOO---OO---OO---OO---OOO----
+--O-----O----O----O-----O-----
+--OOO---OO---OO---OO---OOO----
+------------------------------
+
 
 ---
 name: Maze
-material: classic
+material: brick
 monsters: 4
 ------------------------------
 ---O---O---O---O---OOO--------

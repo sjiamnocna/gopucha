@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,6 +33,7 @@ const (
 	minWindowSize    = 640
 	statusBarHeight  = 80
 	defaultTickInterval = 220 * time.Millisecond
+	monsterTeethBlinkInterval = 150 * time.Millisecond
 )
 
 type GameState int
@@ -68,6 +70,8 @@ type GUIGame struct {
 	mouthAnimDir    int
 	mouthTicker     *time.Ticker
 	disableMonsters bool
+	monsterTeethBlink     bool
+	monsterTeethBlinkLast time.Time
 }
 
 type renderPos struct {
@@ -517,7 +521,9 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 		if i < len(monsterPos) {
 			pos = monsterPos[i]
 		}
-		g.drawMonster(g.offsetX+pos.x*g.blockSize+g.blockSize*0.1, g.offsetY+pos.y*g.blockSize+g.blockSize*0.1, g.blockSize*0.8)
+		moving := math.Abs(float64(pos.x-float32(monster.X))) > 0.001 || math.Abs(float64(pos.y-float32(monster.Y))) > 0.001
+		blinkSwap := g.monsterTeethBlinkSwap(moving)
+		g.drawMonster(g.offsetX+pos.x*g.blockSize+g.blockSize*0.1, g.offsetY+pos.y*g.blockSize+g.blockSize*0.1, g.blockSize*0.8, blinkSwap)
 	}
 
 	// Render player (yellow semi-circle with mouth)
@@ -597,6 +603,56 @@ func (g *GUIGame) drawWallCell(x, y int, m *maps.Map) {
 		return
 	}
 
+	if mat == "purpledots" || mat == "purple-dots" || mat == "purple dots" {
+		base := canvas.NewRectangle(color.RGBA{55, 15, 70, 255})
+		base.Resize(fyne.NewSize(g.blockSize, g.blockSize))
+		base.Move(fyne.NewPos(originX, originY))
+		g.canvas.Add(base)
+
+		seed := int64(x+1)*10007 + int64(y+1)*1009 + int64(m.Width)*37 + int64(m.Height)*97
+		rnd := rand.New(rand.NewSource(seed))
+		dotCount := 6 + rnd.Intn(7)
+
+		centerX := originX + g.blockSize*(0.4+0.2*float32(rnd.Float64()))
+		centerY := originY + g.blockSize*(0.4+0.2*float32(rnd.Float64()))
+		clusterRadius := g.blockSize * (0.28 + 0.08*float32(rnd.Float64()))
+		padding := float32(1)
+
+		for i := 0; i < dotCount; i++ {
+			angle := rnd.Float64() * 2 * math.Pi
+			radius := rnd.Float64() * float64(clusterRadius)
+			dx := float32(math.Cos(angle)) * float32(radius)
+			dy := float32(math.Sin(angle)) * float32(radius)
+			dotSize := g.blockSize * (0.06 + 0.06*float32(rnd.Float64()))
+			xPos := centerX + dx - dotSize/2
+			yPos := centerY + dy - dotSize/2
+
+			minX := originX + padding
+			minY := originY + padding
+			maxX := originX + g.blockSize - dotSize - padding
+			maxY := originY + g.blockSize - dotSize - padding
+			if xPos < minX {
+				xPos = minX
+			} else if xPos > maxX {
+				xPos = maxX
+			}
+			if yPos < minY {
+				yPos = minY
+			} else if yPos > maxY {
+				yPos = maxY
+			}
+
+			shadeR := uint8(120 + rnd.Intn(71))
+			shadeG := uint8(40 + rnd.Intn(51))
+			shadeB := uint8(160 + rnd.Intn(71))
+			dot := canvas.NewCircle(color.RGBA{shadeR, shadeG, shadeB, 255})
+			dot.Resize(fyne.NewSize(dotSize, dotSize))
+			dot.Move(fyne.NewPos(xPos, yPos))
+			g.canvas.Add(dot)
+		}
+		return
+	}
+
 	if mat == "" || mat == "classic" || mat == "steel" || mat == "metal" {
 		base := canvas.NewRectangle(color.RGBA{180, 185, 195, 255})
 		base.Resize(fyne.NewSize(g.blockSize, g.blockSize))
@@ -640,7 +696,24 @@ func (g *GUIGame) drawWallCell(x, y int, m *maps.Map) {
 	g.canvas.Add(defaultWall)
 }
 
-func (g *GUIGame) drawMonster(x, y, size float32) {
+func (g *GUIGame) monsterTeethBlinkSwap(moving bool) bool {
+	if !moving {
+		return false
+	}
+
+	now := time.Now()
+	if g.monsterTeethBlinkLast.IsZero() {
+		g.monsterTeethBlinkLast = now
+		return g.monsterTeethBlink
+	}
+	if now.Sub(g.monsterTeethBlinkLast) >= monsterTeethBlinkInterval {
+		g.monsterTeethBlink = !g.monsterTeethBlink
+		g.monsterTeethBlinkLast = now
+	}
+	return g.monsterTeethBlink
+}
+
+func (g *GUIGame) drawMonster(x, y, size float32, blinkSwap bool) {
 	bodyColor := color.RGBA{255, 0, 0, 255}
 	radius := size * 0.2
 
@@ -670,6 +743,9 @@ func (g *GUIGame) drawMonster(x, y, size float32) {
 		toothColor := color.RGBA{255, 255, 255, 255}
 		if i%2 == 1 {
 			toothColor = color.RGBA{0, 0, 0, 255}
+		}
+		if blinkSwap {
+			toothColor = color.RGBA{255 - toothColor.R, 255 - toothColor.G, 255 - toothColor.B, 255}
 		}
 		tooth := canvas.NewRectangle(toothColor)
 		tooth.Resize(fyne.NewSize(toothWidth, toothHeight))

@@ -2,6 +2,16 @@
 
 Golang Zoner Pampuch reimplemented to Golang with custom maps.
 
+<table>
+  <tr>
+    <td><img src="assets/Screenshot_1.png" alt="Gopucha screenshot" width="420"/></td>
+    <td><img src="assets/Screenshot_2.png" alt="Gopucha bricks design" width="420"/></td>
+    <td><img src="assets/Screenshot_3.png" alt="Gopucha purple" width="420"/></td>
+  </tr>
+</table>
+
+
+
 ## Description
 
 `Ropucha` is Czech word for `toad`, and `Pampuch` is an **old Czech game** similar to `Pacman` but **more complex** in monster movement logic. Therefore the project is named `Gopucha` as a playful combination of `Go`, `Pampuch` and `Ropucha`.
