@@ -31,6 +31,7 @@ const (
 	maxBlockSize     = 50
 	minWindowSize    = 640
 	statusBarHeight  = 80
+	defaultTickInterval = 220 * time.Millisecond
 )
 
 type GameState int
@@ -49,6 +50,8 @@ type GUIGame struct {
 	window          fyne.Window
 	game            *gameplay.Game
 	blockSize       float32
+	offsetX         float32 // X offset for centering the game
+	offsetY         float32 // Y offset for centering the game
 	canvas          *fyne.Container
 	keyCatcher      *keyCatcher
 	ticker          *time.Ticker
@@ -104,7 +107,7 @@ func RunGUIGame(mapFile string, disableMonsters bool) error {
 	guiGame := &GUIGame{
 		app:             app.New(),
 		blockSize:       defaultBlockSize,
-		tickInterval:    260 * time.Millisecond,
+		tickInterval:    defaultTickInterval,
 		mapFile:         mapFile,
 		state:           StateSettings,
 		disableMonsters: disableMonsters,
@@ -412,6 +415,30 @@ func (g *GUIGame) setupGameUI() {
 	// Render initial state
 	g.renderGame(g.infoLabel)
 	g.calculateBlockSize()
+
+	// Add window size tracking for dynamic resizing
+	go func() {
+		lastWidth := float32(0)
+		lastHeight := float32(0)
+		ticker := time.NewTicker(200 * time.Millisecond)
+		defer ticker.Stop()
+		
+		for range ticker.C {
+			if g.window == nil || g.window.Canvas() == nil {
+				continue
+			}
+			size := g.window.Canvas().Size()
+			if size.Width != lastWidth || size.Height != lastHeight {
+				lastWidth = size.Width
+				lastHeight = size.Height
+				// Window size changed, recalculate block size
+				g.calculateBlockSize()
+				fyne.Do(func() {
+					g.renderGame(g.infoLabel)
+				})
+			}
+		}
+	}()
 }
 
 func (g *GUIGame) resizeWindowForMap() {
@@ -466,7 +493,7 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 		for x := 0; x < m.Width; x++ {
 			rect := canvas.NewRectangle(color.RGBA{0, 0, 0, 255})
 			rect.Resize(fyne.NewSize(g.blockSize, g.blockSize))
-			rect.Move(fyne.NewPos(float32(x)*g.blockSize, float32(y)*g.blockSize))
+			rect.Move(fyne.NewPos(g.offsetX+float32(x)*g.blockSize, g.offsetY+float32(y)*g.blockSize))
 			g.canvas.Add(rect)
 
 			switch m.Cells[y][x] {
@@ -478,7 +505,7 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 				dot.StrokeColor = color.RGBA{180, 90, 0, 255}         // Dark orange border
 				dot.StrokeWidth = dotSize * 0.2
 				dot.Resize(fyne.NewSize(dotSize, dotSize))
-				dot.Move(fyne.NewPos(float32(x)*g.blockSize+(g.blockSize-dotSize)/2, float32(y)*g.blockSize+(g.blockSize-dotSize)/2))
+				dot.Move(fyne.NewPos(g.offsetX+float32(x)*g.blockSize+(g.blockSize-dotSize)/2, g.offsetY+float32(y)*g.blockSize+(g.blockSize-dotSize)/2))
 				g.canvas.Add(dot)
 			}
 		}
@@ -490,15 +517,15 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 		if i < len(monsterPos) {
 			pos = monsterPos[i]
 		}
-		g.drawMonster(pos.x*g.blockSize+g.blockSize*0.1, pos.y*g.blockSize+g.blockSize*0.1, g.blockSize*0.8)
+		g.drawMonster(g.offsetX+pos.x*g.blockSize+g.blockSize*0.1, g.offsetY+pos.y*g.blockSize+g.blockSize*0.1, g.blockSize*0.8)
 	}
 
 	// Render player (yellow semi-circle with mouth)
-	g.drawPacman(playerPos.x*g.blockSize+g.blockSize*0.05, playerPos.y*g.blockSize+g.blockSize*0.05, g.blockSize*0.9, g.game.Player.Direction)
+	g.drawPacman(g.offsetX+playerPos.x*g.blockSize+g.blockSize*0.05, g.offsetY+playerPos.y*g.blockSize+g.blockSize*0.05, g.blockSize*0.9, g.game.Player.Direction)
 
 	// Update info
-	infoLabel.SetText(fmt.Sprintf("Level: %d | Score: %d | Lives: %d | Dots: %d | MapSize: %dx%d",
-		g.game.CurrentLevel+1, g.game.Score, g.game.Lives, g.game.CurrentMap.CountDots(), m.Width, m.Height))
+	infoLabel.SetText(fmt.Sprintf("Level: %d | Score: %d | Lives: %d | Dots: %d",
+		g.game.CurrentLevel+1, g.game.Score, g.game.Lives, g.game.CurrentMap.CountDots()))
 
 	// Show/hide controls based on state
 	g.updateControlsVisibility()
@@ -520,8 +547,8 @@ func (g *GUIGame) updateControlsVisibility() {
 }
 
 func (g *GUIGame) drawWallCell(x, y int, m *maps.Map) {
-	originX := float32(x) * g.blockSize
-	originY := float32(y) * g.blockSize
+	originX := g.offsetX + float32(x)*g.blockSize
+	originY := g.offsetY + float32(y)*g.blockSize
 	line := g.blockSize * 0.08
 	if line < 1 {
 		line = 1
@@ -862,32 +889,53 @@ func (g *GUIGame) renderGameWithCountdown(infoLabel *widget.Label) {
 }
 
 func (g *GUIGame) calculateBlockSize() {
-	if g.game == nil || g.game.CurrentMap == nil {
+	if g.game == nil || g.game.CurrentMap == nil || g.window == nil {
 		return
 	}
 
 	m := g.game.CurrentMap
 	canvasSize := g.window.Canvas().Size()
 
-	// Account for UI elements (roughly 100 pixels for top bar)
-	availHeight := canvasSize.Height - 100
+	// Account for status bar (~80 pixels)
+	availHeight := canvasSize.Height - statusBarHeight
 	availWidth := canvasSize.Width
 
+	// Calculate block size based on map dimensions to fill window
 	blockSizeByHeight := availHeight / float32(m.Height)
 	blockSizeByWidth := availWidth / float32(m.Width)
 
-	// Use the smaller to fit in window
+	// Use the smaller to fit entire map in window
 	g.blockSize = blockSizeByHeight
 	if blockSizeByWidth < blockSizeByHeight {
 		g.blockSize = blockSizeByWidth
 	}
 
-	// Clamp to reasonable range
+	// Cap to maximum block size
+	if g.blockSize > maxBlockSize {
+		g.blockSize = maxBlockSize
+	}
+
+	// Clamp to reasonable minimum
 	if g.blockSize < minBlockSize {
 		g.blockSize = minBlockSize
 	}
-	if g.blockSize > maxBlockSize {
-		g.blockSize = maxBlockSize
+
+	// Calculate actual map dimensions in pixels
+	mapPixelWidth := float32(m.Width) * g.blockSize
+	mapPixelHeight := float32(m.Height) * g.blockSize
+
+	// Calculate offsets to center the game if there's extra space
+	g.offsetX = 0
+	g.offsetY = 0
+
+	if mapPixelWidth < availWidth {
+		// Center horizontally
+		g.offsetX = (availWidth - mapPixelWidth) / 2
+	}
+
+	if mapPixelHeight < availHeight {
+		// Center vertically (within available space after status bar)
+		g.offsetY = (availHeight - mapPixelHeight) / 2
 	}
 }
 

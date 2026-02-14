@@ -1,6 +1,6 @@
 name: Author
 material: classic
-monsters: 2
+monsters: 4
 
 ------------------------------
 ---O---O---O---O---OOO OOOO O-
@@ -15,3 +15,21 @@ OOO------OOO--OOOOO----OOOOOOO
 ---OOO--OO-----OO-------------
 ---OOO---OOO--OOOOO---------OO
 ---------------------0000-----
+
+---
+name: Maze
+material: classic
+monsters: 4
+------------------------------
+---O---O---O---O---OOO--------
+---O--O-O--OO--O--OO----------
+---O-O---O-O-O-O-OO-----OOOO--
+-O-O-OOO-O-O--OO--OO----------
+-OOO-O---O-O--OO---OOO--------
+--------------OO--------------
+-OOOO O--OOO------OOO--OOOOO-O
+-O----O---OOOO---OO-------OO-O
+-OOOO-O---------OO-------OO---
+----O-O---OOOO--OO------OO---O
+-OOOO-O------O---OOOO--OOOOO-O
+----------OO------------------
