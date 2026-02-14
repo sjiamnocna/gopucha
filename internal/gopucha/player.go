@@ -1,5 +1,7 @@
 package gopucha
 
+import "sync"
+
 type Direction int
 
 const (
@@ -15,6 +17,7 @@ type Player struct {
 	Direction Direction
 	Desired   Direction
 	Queue     []Direction
+	mu        sync.Mutex // Protects Direction, Desired, and Queue
 }
 
 func NewPlayer(x, y int) *Player {
@@ -28,6 +31,9 @@ func NewPlayer(x, y int) *Player {
 }
 
 func (p *Player) Move(m *Map) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	
 	// If desired direction is available, turn immediately
 	if p.Desired != p.Direction {
 		dx, dy := directionDelta(p.Desired)
@@ -39,6 +45,7 @@ func (p *Player) Move(m *Map) {
 			}
 		}
 	} else if len(p.Queue) > 0 {
+		// Pop next direction from queue
 		p.Desired = p.Queue[0]
 		p.Queue = p.Queue[1:]
 	}
@@ -52,9 +59,18 @@ func (p *Player) Move(m *Map) {
 		p.X = newX
 		p.Y = newY
 	}
+	
+	// Safety measure: if queue somehow grows beyond expected size, trim it
+	// (should never happen with normal SetDirection usage)
+	if len(p.Queue) > 5 {
+		p.Queue = p.Queue[:3]
+	}
 }
 
 func (p *Player) SetDirection(d Direction) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	
 	if d == p.Desired {
 		return
 	}

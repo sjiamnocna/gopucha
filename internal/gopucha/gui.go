@@ -9,7 +9,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"sync/atomic"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -49,6 +49,7 @@ type GUIGame struct {
 	tickInterval time.Duration
 	mapFile      string
 	infoLabel    *widget.Label
+	controlsLabel *widget.Label
 	state        GameState
 	countdownTicks int
 	pauseTicks     int
@@ -58,7 +59,6 @@ type GUIGame struct {
 	mouthAnimDir   int
 	mouthTicker    *time.Ticker
 	disableMonsters bool
-	animToken      uint64
 }
 
 type renderPos struct {
@@ -171,6 +171,10 @@ func (g *GUIGame) showSettings() {
 			}
 			g.startGame()
 			g.initControls()
+			// Ensure focus after dialog closes
+			if g.keyCatcher != nil {
+				g.window.Canvas().Focus(g.keyCatcher)
+			}
 			return
 		}
 
@@ -178,6 +182,10 @@ func (g *GUIGame) showSettings() {
 		if g.state == StateGameOver || g.state == StateSettings {
 			g.startGame()
 			g.initControls()
+			// Ensure focus after dialog closes
+			if g.keyCatcher != nil {
+				g.window.Canvas().Focus(g.keyCatcher)
+			}
 			return
 		}
 
@@ -185,6 +193,10 @@ func (g *GUIGame) showSettings() {
 		if g.state == StatePlaying && g.game != nil {
 			g.startGameLoop()
 			g.initControls()
+			// Ensure focus after dialog closes
+			if g.keyCatcher != nil {
+				g.window.Canvas().Focus(g.keyCatcher)
+			}
 		}
 	}, g.window)
 }
@@ -318,13 +330,22 @@ func (g *GUIGame) setupGameUI() {
 	// Create the game canvas
 	g.canvas = container.NewWithoutLayout()
 
-	// Info panel
+	// Info panel with styled background
 	g.infoLabel = widget.NewLabel(fmt.Sprintf("Level: %d | Score: %d | Lives: %d | Dots: %d",
 		g.game.CurrentLevel+1, g.game.Score, g.game.Lives, g.game.CurrentMap.CountDots()))
+	g.infoLabel.TextStyle = fyne.TextStyle{Bold: true}
 
-	controls := widget.NewLabel("Controls: Arrow Keys to move | +/- to zoom | ESC for settings")
+	g.controlsLabel = widget.NewLabel("Controls: Arrow Keys to move | F2 restart | +/- zoom | ESC settings")
+	g.controlsLabel.TextStyle = fyne.TextStyle{Italic: true}
 
-	topBar := container.NewVBox(g.infoLabel, controls)
+	// Create styled status bar background
+	statusBarBg := canvas.NewRectangle(color.RGBA{40, 40, 50, 255})
+	g.infoLabel.Importance = widget.HighImportance
+
+	// Create status bar with padding
+	infoBox := container.NewVBox(g.infoLabel, g.controlsLabel)
+	topBar := container.NewPadded(infoBox)
+	statusBar := container.NewStack(statusBarBg, topBar)
 
 	// Main container with scroll
 	scroll := container.NewScroll(g.canvas)
@@ -333,12 +354,15 @@ func (g *GUIGame) setupGameUI() {
 	g.initControls()
 	gameArea := container.NewStack(scroll, g.keyCatcher)
 
-	content := container.NewBorder(topBar, nil, nil, nil, gameArea)
+	content := container.NewBorder(statusBar, nil, nil, nil, gameArea)
 
 	g.window.SetContent(content)
 
 	// Focus key catcher so arrow keys (including Up) are not swallowed by scroll
 	g.window.Canvas().Focus(g.keyCatcher)
+	
+	// Ensure keyCatcher stays focused
+	g.keyCatcher.Refresh()
 
 	// Set up mouse scroll for zoom (CTRL+Scroll)
 	// Note: Fyne doesn't directly support scroll events, so we'll rely on keyboard shortcuts
@@ -357,7 +381,6 @@ func (g *GUIGame) initControls() {
 }
 
 func (g *GUIGame) renderGame(infoLabel *widget.Label) {
-	g.cancelAnimations()
 	playerPos, monsterPos := g.capturePositions()
 	g.renderGameAt(infoLabel, playerPos, monsterPos)
 }
@@ -386,7 +409,7 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 
 			switch m.Cells[y][x] {
 			case Wall:
-				rect.FillColor = color.RGBA{0, 0, 255, 255} // Blue walls
+				g.drawWallCell(x, y, m)
 			case Dot:
 				dotSize := g.blockSize * 0.35
 				dot := canvas.NewCircle(color.RGBA{255, 230, 0, 255}) // Yellow fill
@@ -418,7 +441,117 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 	infoLabel.SetText(fmt.Sprintf("Level: %d | Score: %d | Lives: %d | Dots: %d | MapSize: %dx%d",
 		g.game.CurrentLevel+1, g.game.Score, g.game.Lives, g.game.CurrentMap.CountDots(), m.Width, m.Height))
 
+	// Show/hide controls based on state
+	g.updateControlsVisibility()
+
 	g.canvas.Refresh()
+}
+
+func (g *GUIGame) updateControlsVisibility() {
+	if g.controlsLabel == nil {
+		return
+	}
+	
+	// Only show controls during countdown/level start
+	if g.state == StateLevelStart && g.countdownTicks > 0 {
+		g.controlsLabel.SetText("Controls: Arrow Keys to move | F2 restart | +/- zoom | ESC settings")
+	} else {
+		g.controlsLabel.SetText("")
+	}
+}
+
+func (g *GUIGame) drawWallCell(x, y int, m *Map) {
+	originX := float32(x) * g.blockSize
+	originY := float32(y) * g.blockSize
+	line := g.blockSize * 0.08
+	if line < 1 {
+		line = 1
+	}
+
+	mat := strings.ToLower(strings.TrimSpace(m.Material))
+	hasTop := y-1 >= 0 && m.Cells[y-1][x] == Wall
+	hasBottom := y+1 < m.Height && m.Cells[y+1][x] == Wall
+	hasLeft := x-1 >= 0 && m.Cells[y][x-1] == Wall
+	hasRight := x+1 < m.Width && m.Cells[y][x+1] == Wall
+	if mat == "brick" || mat == "bricks" {
+		base := canvas.NewRectangle(color.RGBA{160, 75, 25, 255})
+		base.Resize(fyne.NewSize(g.blockSize, g.blockSize))
+		base.Move(fyne.NewPos(originX, originY))
+		g.canvas.Add(base)
+
+		lineColor := color.RGBA{30, 20, 10, 255}
+		if !hasTop {
+			top := canvas.NewRectangle(lineColor)
+			top.Resize(fyne.NewSize(g.blockSize, line))
+			top.Move(fyne.NewPos(originX, originY))
+			g.canvas.Add(top)
+		}
+
+		if !hasBottom {
+			bottom := canvas.NewRectangle(lineColor)
+			bottom.Resize(fyne.NewSize(g.blockSize, line))
+			bottom.Move(fyne.NewPos(originX, originY+g.blockSize-line))
+			g.canvas.Add(bottom)
+		}
+
+		mid := canvas.NewRectangle(lineColor)
+		mid.Resize(fyne.NewSize(g.blockSize, line))
+		mid.Move(fyne.NewPos(originX, originY+g.blockSize/2-line/2))
+		g.canvas.Add(mid)
+
+		vLeft := canvas.NewRectangle(lineColor)
+		vLeft.Resize(fyne.NewSize(line, g.blockSize/2))
+		vLeft.Move(fyne.NewPos(originX+g.blockSize*0.33, originY))
+		g.canvas.Add(vLeft)
+
+		vRight := canvas.NewRectangle(lineColor)
+		vRight.Resize(fyne.NewSize(line, g.blockSize/2))
+		vRight.Move(fyne.NewPos(originX+g.blockSize*0.66, originY+g.blockSize/2))
+		g.canvas.Add(vRight)
+		return
+	}
+
+	if mat == "" || mat == "classic" || mat == "steel" || mat == "metal" {
+		base := canvas.NewRectangle(color.RGBA{180, 185, 195, 255})
+		base.Resize(fyne.NewSize(g.blockSize, g.blockSize))
+		base.Move(fyne.NewPos(originX, originY))
+		g.canvas.Add(base)
+
+		border := color.RGBA{120, 125, 135, 255}
+		if !hasTop {
+			top := canvas.NewRectangle(border)
+			top.Resize(fyne.NewSize(g.blockSize, line))
+			top.Move(fyne.NewPos(originX, originY))
+			g.canvas.Add(top)
+		}
+
+		if !hasBottom {
+			bottom := canvas.NewRectangle(border)
+			bottom.Resize(fyne.NewSize(g.blockSize, line))
+			bottom.Move(fyne.NewPos(originX, originY+g.blockSize-line))
+			g.canvas.Add(bottom)
+		}
+
+		if !hasLeft {
+			left := canvas.NewRectangle(border)
+			left.Resize(fyne.NewSize(line, g.blockSize))
+			left.Move(fyne.NewPos(originX, originY))
+			g.canvas.Add(left)
+		}
+
+		if !hasRight {
+			right := canvas.NewRectangle(border)
+			right.Resize(fyne.NewSize(line, g.blockSize))
+			right.Move(fyne.NewPos(originX+g.blockSize-line, originY))
+			g.canvas.Add(right)
+		}
+		return
+	}
+
+	defaultWall := canvas.NewRectangle(color.RGBA{0, 0, 255, 255})
+	defaultWall.Resize(fyne.NewSize(g.blockSize, g.blockSize))
+	defaultWall.Move(fyne.NewPos(originX, originY))
+	g.canvas.Add(defaultWall)
 }
 
 func (g *GUIGame) capturePositions() (renderPos, []renderPos) {
@@ -437,42 +570,35 @@ func (g *GUIGame) animateMovement(infoLabel *widget.Label, startPlayer, endPlaye
 		stepDuration = 10 * time.Millisecond
 	}
 
-	animID := atomic.AddUint64(&g.animToken, 1)
+	// Do animation synchronously but quickly
+	for i := 1; i <= steps; i++ {
+		progress := float32(i) / float32(steps)
+		playerPos := renderPos{
+			x: startPlayer.x + (endPlayer.x-startPlayer.x)*progress,
+			y: startPlayer.y + (endPlayer.y-startPlayer.y)*progress,
+		}
 
-	go func() {
-		for i := 1; i <= steps; i++ {
-			if atomic.LoadUint64(&g.animToken) != animID {
-				return
+		monsterPos := make([]renderPos, len(endMonsters))
+		for idx := range endMonsters {
+			start := renderPos{}
+			if idx < len(startMonsters) {
+				start = startMonsters[idx]
 			}
-
-			progress := float32(i) / float32(steps)
-			playerPos := renderPos{
-				x: startPlayer.x + (endPlayer.x-startPlayer.x)*progress,
-				y: startPlayer.y + (endPlayer.y-startPlayer.y)*progress,
+			monsterPos[idx] = renderPos{
+				x: start.x + (endMonsters[idx].x-start.x)*progress,
+				y: start.y + (endMonsters[idx].y-start.y)*progress,
 			}
+		}
 
-			monsterPos := make([]renderPos, len(endMonsters))
-			for idx := range endMonsters {
-				start := renderPos{}
-				if idx < len(startMonsters) {
-					start = startMonsters[idx]
-				}
-				monsterPos[idx] = renderPos{
-					x: start.x + (endMonsters[idx].x-start.x)*progress,
-					y: start.y + (endMonsters[idx].y-start.y)*progress,
-				}
-			}
-
-			fyne.Do(func() {
-				g.renderGameAt(infoLabel, playerPos, monsterPos)
-			})
+		fyne.DoAndWait(func() {
+			g.renderGameAt(infoLabel, playerPos, monsterPos)
+		})
+		
+		// Small sleep between frames
+		if i < steps {
 			time.Sleep(stepDuration)
 		}
-	}()
-}
-
-func (g *GUIGame) cancelAnimations() {
-	atomic.AddUint64(&g.animToken, 1)
+	}
 }
 
 func (g *GUIGame) drawPacman(x, y, size float32, dir Direction) {
@@ -699,6 +825,8 @@ func (g *GUIGame) handleKeyPress(ev *fyne.KeyEvent, infoLabel *widget.Label) {
 		if g.state == StatePlaying {
 			g.showSettings()
 		}
+	case fyne.KeyF2:
+		g.handleF2NewGame()
 	case fyne.KeyEqual, fyne.KeyPlus:
 		// + to zoom in (only during playing, not during countdown/pause)
 		if g.state == StatePlaying {
@@ -710,6 +838,32 @@ func (g *GUIGame) handleKeyPress(ev *fyne.KeyEvent, infoLabel *widget.Label) {
 			g.zoomOut(infoLabel)
 		}
 	}
+}
+
+func (g *GUIGame) handleF2NewGame() {
+	// If game is in progress, show confirmation dialog
+	if g.state == StatePlaying || g.state == StateLevelStart || g.state == StateLevelComplete {
+		dialog.ShowConfirm("New Game", "Start a new game? Current progress will be lost.", func(ok bool) {
+			if ok {
+				g.restartGame()
+			}
+			// Ensure focus returns to keyCatcher after dialog closes
+			if g.keyCatcher != nil {
+				g.window.Canvas().Focus(g.keyCatcher)
+			}
+		}, g.window)
+	} else {
+		// Game is over or won, just restart
+		g.restartGame()
+	}
+}
+
+func (g *GUIGame) restartGame() {
+	if g.ticker != nil {
+		g.ticker.Stop()
+	}
+	g.state = StatePlaying
+	g.startGame()
 }
 
 func (g *GUIGame) zoomIn(infoLabel *widget.Label) {
@@ -734,6 +888,8 @@ func (g *GUIGame) startGameLoop() {
 		defer func() {
 			g.tickerDone <- true
 		}()
+		
+		tickCount := 0
 
 		for range g.ticker.C {
 			if g.game.GameOver {
@@ -749,6 +905,16 @@ func (g *GUIGame) startGameLoop() {
 					dialog.ShowInformation("You Won!", fmt.Sprintf("Final Score: %d", g.game.Score), g.window)
 				})
 				return
+			}
+			
+			// Periodically ensure keyCatcher has focus
+			tickCount++
+			if tickCount%20 == 0 && g.keyCatcher != nil {
+				fyne.Do(func() {
+					if g.window != nil && g.window.Canvas() != nil {
+						g.window.Canvas().Focus(g.keyCatcher)
+					}
+				})
 			}
 
 			// Handle level start countdown phase

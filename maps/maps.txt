@@ -1,59 +1,17 @@
-name: JANČA 1998 Tribute
+name: Author
 material: classic
 monsters: 2
-speedModifier: 1.0
-OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
-O-----------------------------O
-O-OOOO-O-OOO--OOO--OO--OO---O-O
-O-O----O-OO-OO-OO-OOOO-O-O--O-O
-O-OOOO-O-OO----OO-OOOO-O-O--O-O
-O----O-O-OO----OO-OOOO-O--O-O-O
-O-OOOO-O-OO----OO--OO--O---OO-O
-O-----------------------------O
-O----OOO--OOOO--OO--OOO--000--O
-O---O-OO--OOOO-OOO0--OO--000--O
-O--O--OO--OOOO--OOO-OOO-------O
-O-----OO----OO-OOO--OOO-------O
-O-----OO----OO-OOO-OOO--------O
-O-----------------------------O
-OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
----
-name: Block Maze 1
-material: classic
-monsters: 2
-speedModifier: 1.2
-OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
-O-----------------------------O
-O----OOOOO-----------OOOOO----O
-O----OOOOO-----O-----OOOOO----O
-O----OOOOO-----O-----OOOOO----O
-O----OOOOO-----O-----OOOOO----O
-O----OOOOO-----O-----OOOOO----O
-O--------------O--------------O
-O----OOOOO-----O-----OOOOO----O
-O----OOOOO-----O-----OOOOO----O
-O----OOOOO-----O-----OOOOO----O
-O----OOOOO-----O-----OOOOO----O
-O----OOOOO-----O-----OOOOO----O
-O-----------------------------O
-OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
----
-name: Block Maze 2
-material: classic
-monsters: 3
-speedModifier: 0.9
-OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
-O-----------------------------O
-O-----------------------------O
-O-----------------------------O
-O-----OOOOOOOOOOOOOOOOOO-----O
-O-----OOOOOOOOOOOOOOOOOO-----O
-O-----OOOOOOOOOOOOOOOOOO-----O
-O-----OOOOOOOOOOOOOOOOOO-----O
-O-----OOOOOOOOOOOOOOOOOO-----O
-O-----OOOOOOOOOOOOOOOOOO-----O
-O-----OOOOOOOOOOOOOOOOOO-----O
-O-----------------------------O
-O-----------------------------O
-O-----------------------------O
-OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+
+------------------------------
+---O---O---O---O---OOO OOOO O-
+---O--O-O--OO--O--OO---O----O-
+---O-O---O-O-O-O-OO----OOOO-O-
+-O-O-OOO-O-O--OO--OO------O-O-
+-OOO-O---O-O--OO---OOO-OOOO-O-
+------------------------------
+OOO------OOO--OOOOO----OOOOOOO
+--------OO-------OO-----------
+-------OO-------OO--------OOOO
+---OOO--OO-----OO-------------
+---OOO---OOO--OOOOO---------OO
+---------------------0000-----

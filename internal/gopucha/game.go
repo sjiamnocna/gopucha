@@ -56,7 +56,8 @@ func (g *Game) loadLevel(level int) {
 }
 
 func (g *Game) placePlayer() {
-	g.Player = NewPlayer(1, 1)
+	// Reset player to starting position with cleared input queue
+	// Place player at top-left corner (first non-wall position)
 	for y := 0; y < g.CurrentMap.Height; y++ {
 		for x := 0; x < g.CurrentMap.Width; x++ {
 			if !g.CurrentMap.IsWall(x, y) {
@@ -65,6 +66,9 @@ func (g *Game) placePlayer() {
 			}
 		}
 	}
+	
+	// Fallback
+	g.Player = NewPlayer(1, 1)
 }
 
 func (g *Game) placeMonsters() {
@@ -84,12 +88,13 @@ func (g *Game) placeMonsters() {
 
 	// Place monsters
 	g.Monsters = []Monster{}
-	// Corner positions: top-left, top-right, bottom-left, bottom-right
+	// Corner positions: prioritize opposite corners from player (bottom-right first)
+	// Reordered to start from bottom-right, away from top-left where player spawns
 	cornerPositions := [][2]int{
-		{1, 1},                                    // Top-left
-		{g.CurrentMap.Width - 2, 1},              // Top-right
-		{1, g.CurrentMap.Height - 2},             // Bottom-left
 		{g.CurrentMap.Width - 2, g.CurrentMap.Height - 2}, // Bottom-right
+		{1, g.CurrentMap.Height - 2},                      // Bottom-left
+		{g.CurrentMap.Width - 2, 1},                       // Top-right
+		{1, 1},                                             // Top-left (last resort)
 	}
 
 	usedCorners := make(map[int]bool)
@@ -116,7 +121,7 @@ func (g *Game) placeMonsters() {
 				cy = g.CurrentMap.Height - 1
 			}
 
-			// Check if corner is valid
+			// Check if corner is valid and not at player position
 			if !g.CurrentMap.IsWall(cx, cy) && (cx != g.Player.X || cy != g.Player.Y) {
 				x, y = cx, cy
 				usedCorners[cornerIdx] = true
@@ -151,6 +156,15 @@ func (g *Game) Update() {
 		return
 	}
 	
+	// Store monster positions before they move
+	oldMonsterPos := make([][2]int, len(g.Monsters))
+	for i := range g.Monsters {
+		oldMonsterPos[i] = [2]int{g.Monsters[i].X, g.Monsters[i].Y}
+	}
+	
+	// Store player position before moving
+	oldPlayerX, oldPlayerY := g.Player.X, g.Player.Y
+	
 	// Move player
 	g.Player.Move(g.CurrentMap)
 	
@@ -170,9 +184,25 @@ func (g *Game) Update() {
 		g.Monsters[i].Move(g.CurrentMap, g.Player.X, g.Player.Y, g.Monsters)
 	}
 	
-	// Check collision with monsters
-	for _, monster := range g.Monsters {
+	// Check collision with monsters (including position swaps)
+	for i, monster := range g.Monsters {
+		// Same cell collision
 		if g.Player.X == monster.X && g.Player.Y == monster.Y {
+			g.Lives--
+			if g.Lives <= 0 {
+				g.GameOver = true
+				g.LifeLost = false
+			} else {
+				g.LifeLost = true
+				g.placePlayer()
+				g.placeMonsters()
+			}
+			return
+		}
+		
+		// Swap collision (player and monster passed through each other)
+		if g.Player.X == oldMonsterPos[i][0] && g.Player.Y == oldMonsterPos[i][1] &&
+			monster.X == oldPlayerX && monster.Y == oldPlayerY {
 			g.Lives--
 			if g.Lives <= 0 {
 				g.GameOver = true
