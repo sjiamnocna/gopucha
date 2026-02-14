@@ -326,3 +326,49 @@ func TestParseMapSpeedModifier(t *testing.T) {
 		})
 	}
 }
+
+func TestMapRequiresTwoEscapesWhenMonstersPresent(t *testing.T) {
+	content := `monsters: 1
+OOO
+O-O
+OOO
+`
+	tmpFile, err := os.CreateTemp("", "test_map_*.txt")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(content); err != nil {
+		t.Fatalf("Failed to write to temp file: %v", err)
+	}
+	tmpFile.Close()
+
+	_, err = LoadMapsFromFile(tmpFile.Name())
+	if err == nil {
+		t.Error("Expected error when monsters are present and only one escape route exists")
+	}
+}
+
+func TestMapAllowsSingleEscapeWithoutMonsters(t *testing.T) {
+	content := `monsters: 0
+OOO
+O-O
+OOO
+`
+	tmpFile, err := os.CreateTemp("", "test_map_*.txt")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(content); err != nil {
+		t.Fatalf("Failed to write to temp file: %v", err)
+	}
+	tmpFile.Close()
+
+	_, err = LoadMapsFromFile(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("Expected map to load without monsters, got error: %v", err)
+	}
+}

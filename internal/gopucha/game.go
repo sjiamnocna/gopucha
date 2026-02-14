@@ -48,26 +48,31 @@ func (g *Game) loadLevel(level int) {
 	g.CurrentLevel = level
 	g.CurrentMap = &g.Maps[level]
 	g.CurrentSpeedModifier = g.CurrentMap.SpeedModifier
-	
-	// Place player at first non-wall position
+
+	g.placePlayer()
+	// Remove dot at player's starting position
+	g.CurrentMap.EatDot(g.Player.X, g.Player.Y)
+	g.placeMonsters()
+}
+
+func (g *Game) placePlayer() {
 	g.Player = NewPlayer(1, 1)
 	for y := 0; y < g.CurrentMap.Height; y++ {
 		for x := 0; x < g.CurrentMap.Width; x++ {
 			if !g.CurrentMap.IsWall(x, y) {
 				g.Player = NewPlayer(x, y)
-				goto PlayerPlaced
+				return
 			}
 		}
 	}
-PlayerPlaced:
-	// Remove dot at player's starting position
-	g.CurrentMap.EatDot(g.Player.X, g.Player.Y)
+}
+
+func (g *Game) placeMonsters() {
 	if g.DisableMonsters {
 		g.Monsters = nil
 		return
 	}
 
-	// Use map-defined monster count
 	numMonsters := g.CurrentMap.MonsterCount
 	if numMonsters < 0 {
 		numMonsters = 0
@@ -76,7 +81,7 @@ PlayerPlaced:
 		g.Monsters = nil
 		return
 	}
-	
+
 	// Place monsters
 	g.Monsters = []Monster{}
 	// Corner positions: top-left, top-right, bottom-left, bottom-right
@@ -86,23 +91,23 @@ PlayerPlaced:
 		{1, g.CurrentMap.Height - 2},             // Bottom-left
 		{g.CurrentMap.Width - 2, g.CurrentMap.Height - 2}, // Bottom-right
 	}
-	
+
 	usedCorners := make(map[int]bool)
-	
+
 	for i := 0; i < numMonsters; i++ {
 		var x, y int
 		found := false
-		
+
 		// Try to find an unblocked corner
 		for j := 0; j < len(cornerPositions); j++ {
 			cornerIdx := (i + j) % len(cornerPositions)
 			if usedCorners[cornerIdx] {
 				continue
 			}
-			
+
 			pos := cornerPositions[cornerIdx]
 			cx, cy := pos[0], pos[1]
-			
+
 			// Adjust if out of bounds
 			if cx >= g.CurrentMap.Width {
 				cx = g.CurrentMap.Width - 1
@@ -110,7 +115,7 @@ PlayerPlaced:
 			if cy >= g.CurrentMap.Height {
 				cy = g.CurrentMap.Height - 1
 			}
-			
+
 			// Check if corner is valid
 			if !g.CurrentMap.IsWall(cx, cy) && (cx != g.Player.X || cy != g.Player.Y) {
 				x, y = cx, cy
@@ -119,7 +124,7 @@ PlayerPlaced:
 				break
 			}
 		}
-		
+
 		// If no corner available, search for any valid position
 		if !found {
 			for dy := 0; dy < g.CurrentMap.Height && !found; dy++ {
@@ -131,11 +136,11 @@ PlayerPlaced:
 				}
 			}
 		}
-		
+
 		if !found {
 			continue // Skip this monster if no valid position found
 		}
-		
+
 		dir := Direction(i % 4)
 		g.Monsters = append(g.Monsters, *NewMonster(x, y, dir))
 	}
@@ -169,21 +174,13 @@ func (g *Game) Update() {
 	for _, monster := range g.Monsters {
 		if g.Player.X == monster.X && g.Player.Y == monster.Y {
 			g.Lives--
-			g.LifeLost = true
 			if g.Lives <= 0 {
 				g.GameOver = true
+				g.LifeLost = false
 			} else {
-				// Reset player position on this level
-				g.Player = NewPlayer(1, 1)
-				for y := 0; y < g.CurrentMap.Height; y++ {
-					for x := 0; x < g.CurrentMap.Width; x++ {
-						if !g.CurrentMap.IsWall(x, y) {
-							g.Player = NewPlayer(x, y)
-							goto PlayerReset
-						}
-					}
-				}
-			PlayerReset:
+				g.LifeLost = true
+				g.placePlayer()
+				g.placeMonsters()
 			}
 			return
 		}

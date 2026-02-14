@@ -219,6 +219,7 @@ func validateMap(m *Map) error {
 		return fmt.Errorf("map has no walkable cells")
 	}
 
+
 	dotCount := 0
 	dotStartX, dotStartY := -1, -1
 	for y := 0; y < m.Height; y++ {

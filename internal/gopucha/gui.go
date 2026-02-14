@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -57,6 +58,12 @@ type GUIGame struct {
 	mouthAnimDir   int
 	mouthTicker    *time.Ticker
 	disableMonsters bool
+	animToken      uint64
+}
+
+type renderPos struct {
+	x float32
+	y float32
 }
 
 type keyCatcher struct {
@@ -91,7 +98,7 @@ func RunGUIGame(mapFile string, disableMonsters bool) error {
 	guiGame := &GUIGame{
 		app:          app.New(),
 		blockSize:    defaultBlockSize,
-		tickInterval: 340 * time.Millisecond,
+		tickInterval: 260 * time.Millisecond,
 		mapFile:      mapFile,
 		state:        StateSettings,
 		disableMonsters: disableMonsters,
@@ -347,12 +354,15 @@ func (g *GUIGame) initControls() {
 			g.handleKeyPress(ev, g.infoLabel)
 		})
 	}
-	if g.window != nil && g.window.Canvas() != nil {
-		g.window.Canvas().Focus(g.keyCatcher)
-	}
 }
 
 func (g *GUIGame) renderGame(infoLabel *widget.Label) {
+	g.cancelAnimations()
+	playerPos, monsterPos := g.capturePositions()
+	g.renderGameAt(infoLabel, playerPos, monsterPos)
+}
+
+func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, monsterPos []renderPos) {
 	if g.game == nil || g.game.CurrentMap == nil {
 		return
 	}
@@ -360,7 +370,7 @@ func (g *GUIGame) renderGame(infoLabel *widget.Label) {
 	g.canvas.Objects = nil
 
 	m := g.game.CurrentMap
-	
+
 	// Calculate canvas dimensions
 	canvasWidth := float32(m.Width) * g.blockSize
 	canvasHeight := float32(m.Height) * g.blockSize
@@ -372,38 +382,97 @@ func (g *GUIGame) renderGame(infoLabel *widget.Label) {
 			rect := canvas.NewRectangle(color.RGBA{0, 0, 0, 255})
 			rect.Resize(fyne.NewSize(g.blockSize, g.blockSize))
 			rect.Move(fyne.NewPos(float32(x)*g.blockSize, float32(y)*g.blockSize))
+			g.canvas.Add(rect)
 
 			switch m.Cells[y][x] {
 			case Wall:
 				rect.FillColor = color.RGBA{0, 0, 255, 255} // Blue walls
 			case Dot:
-				rect.FillColor = color.RGBA{255, 255, 255, 255} // White dots
-				rect.Resize(fyne.NewSize(g.blockSize/3, g.blockSize/3))
-				rect.Move(fyne.NewPos(float32(x)*g.blockSize+g.blockSize/3, float32(y)*g.blockSize+g.blockSize/3))
-			case Empty:
-				rect.FillColor = color.RGBA{0, 0, 0, 255} // Black empty space
+				dotSize := g.blockSize * 0.35
+				dot := canvas.NewCircle(color.RGBA{255, 230, 0, 255}) // Yellow fill
+				dot.StrokeColor = color.RGBA{180, 90, 0, 255}         // Dark orange border
+				dot.StrokeWidth = dotSize * 0.2
+				dot.Resize(fyne.NewSize(dotSize, dotSize))
+				dot.Move(fyne.NewPos(float32(x)*g.blockSize+(g.blockSize-dotSize)/2, float32(y)*g.blockSize+(g.blockSize-dotSize)/2))
+				g.canvas.Add(dot)
 			}
-
-			g.canvas.Add(rect)
 		}
 	}
 
 	// Render monsters
-	for _, monster := range g.game.Monsters {
+	for i, monster := range g.game.Monsters {
+		pos := renderPos{x: float32(monster.X), y: float32(monster.Y)}
+		if i < len(monsterPos) {
+			pos = monsterPos[i]
+		}
 		rect := canvas.NewRectangle(color.RGBA{255, 0, 0, 255}) // Red monsters
 		rect.Resize(fyne.NewSize(g.blockSize*0.8, g.blockSize*0.8))
-		rect.Move(fyne.NewPos(float32(monster.X)*g.blockSize+g.blockSize*0.1, float32(monster.Y)*g.blockSize+g.blockSize*0.1))
+		rect.Move(fyne.NewPos(pos.x*g.blockSize+g.blockSize*0.1, pos.y*g.blockSize+g.blockSize*0.1))
 		g.canvas.Add(rect)
 	}
 
 	// Render player (yellow semi-circle with mouth)
-	g.drawPacman(float32(g.game.Player.X)*g.blockSize+g.blockSize*0.05, float32(g.game.Player.Y)*g.blockSize+g.blockSize*0.05, g.blockSize*0.9, g.game.Player.Direction)
+	g.drawPacman(playerPos.x*g.blockSize+g.blockSize*0.05, playerPos.y*g.blockSize+g.blockSize*0.05, g.blockSize*0.9, g.game.Player.Direction)
 
 	// Update info
 	infoLabel.SetText(fmt.Sprintf("Level: %d | Score: %d | Lives: %d | Dots: %d | MapSize: %dx%d",
 		g.game.CurrentLevel+1, g.game.Score, g.game.Lives, g.game.CurrentMap.CountDots(), m.Width, m.Height))
 
 	g.canvas.Refresh()
+}
+
+func (g *GUIGame) capturePositions() (renderPos, []renderPos) {
+	playerPos := renderPos{x: float32(g.game.Player.X), y: float32(g.game.Player.Y)}
+	monsterPos := make([]renderPos, len(g.game.Monsters))
+	for i, monster := range g.game.Monsters {
+		monsterPos[i] = renderPos{x: float32(monster.X), y: float32(monster.Y)}
+	}
+	return playerPos, monsterPos
+}
+
+func (g *GUIGame) animateMovement(infoLabel *widget.Label, startPlayer, endPlayer renderPos, startMonsters, endMonsters []renderPos) {
+	steps := 4
+	stepDuration := g.tickInterval / time.Duration(steps)
+	if stepDuration < 10*time.Millisecond {
+		stepDuration = 10 * time.Millisecond
+	}
+
+	animID := atomic.AddUint64(&g.animToken, 1)
+
+	go func() {
+		for i := 1; i <= steps; i++ {
+			if atomic.LoadUint64(&g.animToken) != animID {
+				return
+			}
+
+			progress := float32(i) / float32(steps)
+			playerPos := renderPos{
+				x: startPlayer.x + (endPlayer.x-startPlayer.x)*progress,
+				y: startPlayer.y + (endPlayer.y-startPlayer.y)*progress,
+			}
+
+			monsterPos := make([]renderPos, len(endMonsters))
+			for idx := range endMonsters {
+				start := renderPos{}
+				if idx < len(startMonsters) {
+					start = startMonsters[idx]
+				}
+				monsterPos[idx] = renderPos{
+					x: start.x + (endMonsters[idx].x-start.x)*progress,
+					y: start.y + (endMonsters[idx].y-start.y)*progress,
+				}
+			}
+
+			fyne.Do(func() {
+				g.renderGameAt(infoLabel, playerPos, monsterPos)
+			})
+			time.Sleep(stepDuration)
+		}
+	}()
+}
+
+func (g *GUIGame) cancelAnimations() {
+	atomic.AddUint64(&g.animToken, 1)
 }
 
 func (g *GUIGame) drawPacman(x, y, size float32, dir Direction) {
@@ -522,10 +591,6 @@ func (g *GUIGame) startMouthAnimation() {
 				g.mouthOpenRatio = 0
 				g.mouthAnimDir = 0
 			}
-
-			fyne.DoAndWait(func() {
-				g.renderGame(g.infoLabel)
-			})
 		}
 	}()
 }
@@ -671,6 +736,21 @@ func (g *GUIGame) startGameLoop() {
 		}()
 
 		for range g.ticker.C {
+			if g.game.GameOver {
+				g.ticker.Stop()
+				g.state = StateGameOver
+				return
+			}
+
+			if g.game.Won {
+				g.ticker.Stop()
+				g.state = StateWon
+				fyne.Do(func() {
+					dialog.ShowInformation("You Won!", fmt.Sprintf("Final Score: %d", g.game.Score), g.window)
+				})
+				return
+			}
+
 			// Handle level start countdown phase
 			if g.state == StateLevelStart {
 				if g.countdownTicks > 0 {
@@ -702,21 +782,6 @@ func (g *GUIGame) startGameLoop() {
 				continue
 			}
 
-			if g.game.GameOver {
-				g.ticker.Stop()
-				g.state = StateGameOver
-				return
-			}
-
-			if g.game.Won {
-				g.ticker.Stop()
-				g.state = StateWon
-				fyne.Do(func() {
-					dialog.ShowInformation("You Won!", fmt.Sprintf("Final Score: %d", g.game.Score), g.window)
-				})
-				return
-			}
-
 			// Only update game during StatePlaying
 			if g.state != StatePlaying {
 				fyne.DoAndWait(func() {
@@ -725,22 +790,27 @@ func (g *GUIGame) startGameLoop() {
 				continue
 			}
 
+			startPlayer, startMonsters := g.capturePositions()
 			g.game.Update()
+			endPlayer, endMonsters := g.capturePositions()
 
 			// Mouth animation: smooth open/close on dot eat
 			if g.game.DotEaten {
 				g.startMouthAnimation()
 			}
 
+			lifeLost := g.game.LifeLost
+			levelCompleted := g.game.LevelCompleted
+
 			// Restart countdown if a life was lost
-			if g.game.LifeLost {
+			if lifeLost {
 				g.countdownTicks = 5
 				g.game.LifeLost = false
 				g.state = StateLevelStart
 			}
 
 			// Check if level is completed
-			if g.game.LevelCompleted {
+			if levelCompleted {
 				g.game.LevelCompleted = false
 				
 				// Check if all levels are done
@@ -752,9 +822,14 @@ func (g *GUIGame) startGameLoop() {
 				}
 			}
 
-			fyne.DoAndWait(func() {
-				g.renderGame(g.infoLabel)
-			})
+			if lifeLost || levelCompleted || g.game.GameOver || g.game.Won {
+				fyne.DoAndWait(func() {
+					g.renderGame(g.infoLabel)
+				})
+				continue
+			}
+
+			g.animateMovement(g.infoLabel, startPlayer, endPlayer, startMonsters, endMonsters)
 		}
 	}()
 }

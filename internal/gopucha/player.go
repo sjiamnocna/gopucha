@@ -14,6 +14,7 @@ type Player struct {
 	Y         int
 	Direction Direction
 	Desired   Direction
+	Queue     []Direction
 }
 
 func NewPlayer(x, y int) *Player {
@@ -22,6 +23,7 @@ func NewPlayer(x, y int) *Player {
 		Y:         y,
 		Direction: Right,
 		Desired:   Right,
+		Queue:     nil,
 	}
 }
 
@@ -31,7 +33,14 @@ func (p *Player) Move(m *Map) {
 		dx, dy := directionDelta(p.Desired)
 		if !m.IsWall(p.X+dx, p.Y+dy) {
 			p.Direction = p.Desired
+			if len(p.Queue) > 0 {
+				p.Desired = p.Queue[0]
+				p.Queue = p.Queue[1:]
+			}
 		}
+	} else if len(p.Queue) > 0 {
+		p.Desired = p.Queue[0]
+		p.Queue = p.Queue[1:]
 	}
 
 	newX, newY := p.X, p.Y
@@ -46,7 +55,24 @@ func (p *Player) Move(m *Map) {
 }
 
 func (p *Player) SetDirection(d Direction) {
-	p.Desired = d
+	if d == p.Desired {
+		return
+	}
+
+	if p.Desired == p.Direction {
+		p.Desired = d
+		return
+	}
+
+	if len(p.Queue) > 0 && p.Queue[len(p.Queue)-1] == d {
+		return
+	}
+
+	if len(p.Queue) >= 3 {
+		p.Queue[len(p.Queue)-1] = d
+		return
+	}
+	p.Queue = append(p.Queue, d)
 }
 
 func directionDelta(d Direction) (int, int) {
