@@ -1,6 +1,8 @@
 # Gopucha
 
-Golang Zoner Pampuch reimplemented to Golang with custom maps.
+Golang version of Pampuch reimplemented with custom maps.
+
+## Screenshots
 
 <table>
   <tr>
@@ -9,8 +11,6 @@ Golang Zoner Pampuch reimplemented to Golang with custom maps.
     <td><img src="assets/Screenshot_3.png" alt="Gopucha purple" width="420"/></td>
   </tr>
 </table>
-
-
 
 ## Description
 
