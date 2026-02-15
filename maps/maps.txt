@@ -1,55 +1,61 @@
-name: Author
-material: classic
-monsters: 4
-
-------------------------------
----O---O---O---O---OOO OOOO O-
----O--O-O--OO--O--OO---O----O-
----O-O---O-O-O-O-OO----OOOO-O-
--O-O-OOO-O-O--OO--OO------O-O-
--OOO-O---O-O--OO---OOO-OOOO-O-
-------------------------------
-OOO------OOO--OOOOO----OOOOOOO
---------OO-------OO-----------
--------OO-------OO--------OOOO
----OOO--OO-----OO-------------
----OOO---OOO--OOOOO---------OO
----------------------OOOO-----
-
-
----
-name: Pampuch Original (Resized)
-material: purpledots
-monsters: 3
-------------------------------
---OOOO--OO---OO---OO---OOO----
---O--O--O----O----O----O-O----
---OO-O--OO---OO---OO---O-O----
-------OOO----------OOO--------
---OO--O---O--OOOO--O---O--OO--
---OO--O---O-----O--O---O--OO--
---OO--OOOOO--OOOO--OOOOO--OO--
-------O------------OOO--------
---OOO---OO---OO---OO---OOO----
---O-----O----O----O-----O-----
---OOO---OO---OO---OO---OOO----
-------------------------------
-
-
----
-name: Maze
+name: Sandokan
 material: brick
-monsters: 4
-------------------------------
----O---O---O---O---OOO--------
----O--O-O--OO--O--OO----------
----O-O---O-O-O-O-OO-----OOOO--
--O-O-OOO-O-O--OO--OO----------
--OOO-O---O-O--OO---OOO--------
---------------OO--------------
--OOOO O--OOO------OOO--OOOOO-O
--O----O---OOOO---OO-------OO-O
--OOOO-O---------OO-------OO---
-----O-O---OOOO--OO------OO---O
--OOOO-O------O---OOOO--OOOOO-O
-----------OO------------------
+
+M-------O----------O---M
+--------O----------O----
+--------O----------O----
+OOOO----O----------O----
+------------------------
+-------------------OOOOO
+------------------------
+M------------O---OOO---M
+------------------------
+------------------------
+OOOOOOOOOOO-------------
+------------P--------OOO
+-----O------------------
+-----O------------------
+-----O----------O-------
+M----O----OOOOOOO------M
+
+---
+name: Mobby Dick
+material: purpledots
+
+-------O-O-O-O-O-O-O-O-O
+-O-OO-------------------
+------O-O-O-O-O-O-O-O-OO
+OOOOO-OOOOOOOOOOOOOOOOOO
+------O-O-O-O-O-O-O-O-OO
+-O-O--------------------
+-----O-O-O-O-O-O-O-O-O-O
+OOOO-OOOOOOOOOOOOOOOOOOO
+-----O-O-O-O-O-O-O-O-O-O
+-OO---------------------
+----O-O-O-O-O-O-O-O-O-OO
+OOO-OOOOOOOOOOOOOOOOOOOO
+----O-O-O-O-O-O-O-O-O-OO
+-O----------------------
+-O-O-O-O-O-O-O-O-O-O-O-O
+------------------------
+
+---
+name: Archeolog
+material: classic
+
+OM--------O---O-------MO
+O-OOOOOOOOO---OOOOOOOO-O
+O--OO-------O-----OO---O
+O--O--OOOOO-OOOOO--O---O
+O-----O---O-----O------O
+O-O---O-----O---O---OO-O
+O---O-O-OOOOOOO-O-O----O
+OO----O-O-----O-O-----OO
+O-----O---O---O-O------O
+O----OO-OOO-OOO-OO-----O
+O--O--O---------O--O---O
+O-----OOOOOOOOOOO------O
+O--OO------O------OO---O
+OOOO-------O-------OOOOO
+O---------OOO----------O
+OP---O-----------O----MO
