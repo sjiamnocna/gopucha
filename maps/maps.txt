@@ -17,6 +17,44 @@ M----------------------M
 ----OO--------------OO--
 M-----------P----------M
 ---
+name: Four Rooms Lite
+material: bricks
+M----------------------M
+-OOOOOO------OOOOOO-----
+-O-----------O----------
+-O----O------O----O-----
+------O-----------O-----
+-OOOOOO---OO0OOOOOO-----
+--------O--OO--O--------
+--------O------O--------
+-----OOOO--OO--OOOO-----
+-----O----O--O----O-----
+-----O----O--O----O-----
+-----O----O--O----O-----
+-----OOOOOO--OOOOOO-----
+----------P-------------
+------------------------
+M----------------------M
+---
+name: Easy Loop
+material: purpledots
+M----------------------M
+-O-OOOOOOOO--OOOOOOOO-O-
+-O-O------O--O------O-O-
+-O-O-OOOO-O--O-OOOO-O-O-
+---O-O----O--O----O-O---
+-O-O-O-OO-O--O-OO-O-O-O-
+-O-O-O-O--O--O--O-O-O-O-
+-O---O-O-----P--O-O---O-
+-O-O-O-O--O--O--O-O-O-O-
+-O-O-O-OO-O--O-OO-O-O-O-
+---O-O----O--O----O-O---
+-O-O-OOOO-O--O-OOOO-O-O-
+-O-O------O--O------O-O-
+-O-OOOOOOOO--OOOOOOOO-O-
+------------------------
+M----------------------M
+---
 name: Grave robber
 material: bricks
 ----OOOOOOOO---OOOOOO---
