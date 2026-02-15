@@ -18,12 +18,17 @@ func (p *Player) Move(m *maps.Map) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// If desired direction is available, turn immediately
+	// If desired direction is available, turn immediately.
 	if p.Desired != p.Direction {
 		dx, dy := directionDelta(p.Desired)
 		if !m.IsWall(p.X+dx, p.Y+dy) {
 			p.Direction = p.Desired
+			p.dropQueued(p.Direction)
+		} else {
+			p.applyQueuedTurn(m)
 		}
+	} else {
+		p.applyQueuedTurn(m)
 	}
 
 	newX, newY := p.X, p.Y
@@ -46,8 +51,44 @@ func (p *Player) SetDirection(d Direction) {
 		return
 	}
 
-	// Last pressed direction always wins
+	// Last pressed direction always wins, but keep a short queue for fast turns.
 	p.Desired = d
+	if len(p.Queue) == 0 || p.Queue[len(p.Queue)-1] != d {
+		p.Queue = append(p.Queue, d)
+		if len(p.Queue) > 2 {
+			p.Queue = p.Queue[len(p.Queue)-2:]
+		}
+	}
+}
+
+func (p *Player) applyQueuedTurn(m *maps.Map) {
+	if len(p.Queue) == 0 {
+		return
+	}
+
+	for i, d := range p.Queue {
+		dx, dy := directionDelta(d)
+		if !m.IsWall(p.X+dx, p.Y+dy) {
+			p.Desired = d
+			p.Direction = d
+			p.Queue = p.Queue[i+1:]
+			return
+		}
+	}
+}
+
+func (p *Player) dropQueued(d Direction) {
+	if len(p.Queue) == 0 {
+		return
+	}
+
+	filtered := p.Queue[:0]
+	for _, q := range p.Queue {
+		if q != d {
+			filtered = append(filtered, q)
+		}
+	}
+	p.Queue = filtered
 }
 
 func directionDelta(d Direction) (int, int) {

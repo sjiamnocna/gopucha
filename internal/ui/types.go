@@ -46,6 +46,7 @@ type GUIGame struct {
 	disableMonsters       bool
 	monsterTeethBlink     bool
 	monsterTeethBlinkLast time.Time
+	cachedMapRender       []fyne.CanvasObject // Cached static map layer
 }
 
 type renderPos struct {

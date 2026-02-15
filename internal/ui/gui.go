@@ -316,6 +316,7 @@ func (g *GUIGame) showMapErrorAndClose(err error) {
 func (g *GUIGame) setupGameUI() {
 	// Create the game canvas
 	g.canvas = container.NewWithoutLayout()
+	g.cachedMapRender = nil
 
 	// Info panel with styled background
 	g.infoLabel = widget.NewLabel(fmt.Sprintf("Level: %d | Score: %d | Lives: %d | Dots: %d",
@@ -347,6 +348,9 @@ func (g *GUIGame) setupGameUI() {
 	contentWithMin := container.NewMax(minRect, content)
 
 	g.window.SetContent(contentWithMin)
+	g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+		g.handleKeyPress(ev, g.infoLabel)
+	})
 	g.resizeWindowForMap()
 
 	// Focus key catcher so arrow keys (including Up) are not swallowed by scroll
@@ -425,8 +429,6 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 		return
 	}
 
-	g.canvas.Objects = nil
-
 	m := g.game.CurrentMap
 
 	// Calculate canvas dimensions
@@ -434,21 +436,37 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 	canvasHeight := float32(m.Height) * g.blockSize
 	g.canvas.Resize(fyne.NewSize(canvasWidth, canvasHeight))
 
-	// Render cells
+	// Rebuild cache if needed (map changed or block size changed)
+	if len(g.cachedMapRender) == 0 {
+		objects := make([]fyne.CanvasObject, 0, m.Width*m.Height*3)
+
+		// Pre-render backgrounds and walls (static parts)
+		for y := 0; y < m.Height; y++ {
+			for x := 0; x < m.Width; x++ {
+				rect := canvas.NewRectangle(color.RGBA{0, 0, 0, 255})
+				rect.Resize(fyne.NewSize(g.blockSize, g.blockSize))
+				rect.Move(fyne.NewPos(g.offsetX+float32(x)*g.blockSize, g.offsetY+float32(y)*g.blockSize))
+				objects = append(objects, rect)
+
+				if m.Cells[y][x] == maps.Wall {
+					// Inline wall drawing to avoid extra function calls
+					g.drawWallCellInto(x, y, m, &objects)
+				}
+			}
+		}
+		g.cachedMapRender = objects
+	}
+
+	// Start with cached static layer
+	g.canvas.Objects = append([]fyne.CanvasObject{}, g.cachedMapRender...)
+
+	// Add dots (dynamic, eaten dots disappear)
 	for y := 0; y < m.Height; y++ {
 		for x := 0; x < m.Width; x++ {
-			rect := canvas.NewRectangle(color.RGBA{0, 0, 0, 255})
-			rect.Resize(fyne.NewSize(g.blockSize, g.blockSize))
-			rect.Move(fyne.NewPos(g.offsetX+float32(x)*g.blockSize, g.offsetY+float32(y)*g.blockSize))
-			g.canvas.Add(rect)
-
-			switch m.Cells[y][x] {
-			case maps.Wall:
-				g.drawWallCell(x, y, m)
-			case maps.Dot:
+			if m.Cells[y][x] == maps.Dot {
 				dotSize := g.blockSize * 0.35
-				dot := canvas.NewCircle(color.RGBA{255, 230, 0, 255}) // Yellow fill
-				dot.StrokeColor = color.RGBA{180, 90, 0, 255}         // Dark orange border
+				dot := canvas.NewCircle(color.RGBA{255, 230, 0, 255})
+				dot.StrokeColor = color.RGBA{180, 90, 0, 255}
 				dot.StrokeWidth = dotSize * 0.2
 				dot.Resize(fyne.NewSize(dotSize, dotSize))
 				dot.Move(fyne.NewPos(g.offsetX+float32(x)*g.blockSize+(g.blockSize-dotSize)/2, g.offsetY+float32(y)*g.blockSize+(g.blockSize-dotSize)/2))
@@ -495,6 +513,14 @@ func (g *GUIGame) updateControlsVisibility() {
 }
 
 func (g *GUIGame) drawWallCell(x, y int, m *maps.Map) {
+	objs := make([]fyne.CanvasObject, 0)
+	g.drawWallCellInto(x, y, m, &objs)
+	for _, obj := range objs {
+		g.canvas.Add(obj)
+	}
+}
+
+func (g *GUIGame) drawWallCellInto(x, y int, m *maps.Map, objs *[]fyne.CanvasObject) {
 	originX := g.offsetX + float32(x)*g.blockSize
 	originY := g.offsetY + float32(y)*g.blockSize
 	line := g.blockSize * 0.08
@@ -511,37 +537,37 @@ func (g *GUIGame) drawWallCell(x, y int, m *maps.Map) {
 		base := canvas.NewRectangle(color.RGBA{160, 75, 25, 255})
 		base.Resize(fyne.NewSize(g.blockSize, g.blockSize))
 		base.Move(fyne.NewPos(originX, originY))
-		g.canvas.Add(base)
+		*objs = append(*objs, base)
 
 		lineColor := color.RGBA{30, 20, 10, 255}
 		if !hasTop {
 			top := canvas.NewRectangle(lineColor)
 			top.Resize(fyne.NewSize(g.blockSize, line))
 			top.Move(fyne.NewPos(originX, originY))
-			g.canvas.Add(top)
+			*objs = append(*objs, top)
 		}
 
 		if !hasBottom {
 			bottom := canvas.NewRectangle(lineColor)
 			bottom.Resize(fyne.NewSize(g.blockSize, line))
 			bottom.Move(fyne.NewPos(originX, originY+g.blockSize-line))
-			g.canvas.Add(bottom)
+			*objs = append(*objs, bottom)
 		}
 
 		mid := canvas.NewRectangle(lineColor)
 		mid.Resize(fyne.NewSize(g.blockSize, line))
 		mid.Move(fyne.NewPos(originX, originY+g.blockSize/2-line/2))
-		g.canvas.Add(mid)
+		*objs = append(*objs, mid)
 
 		vLeft := canvas.NewRectangle(lineColor)
 		vLeft.Resize(fyne.NewSize(line, g.blockSize/2))
 		vLeft.Move(fyne.NewPos(originX+g.blockSize*0.33, originY))
-		g.canvas.Add(vLeft)
+		*objs = append(*objs, vLeft)
 
 		vRight := canvas.NewRectangle(lineColor)
 		vRight.Resize(fyne.NewSize(line, g.blockSize/2))
 		vRight.Move(fyne.NewPos(originX+g.blockSize*0.66, originY+g.blockSize/2))
-		g.canvas.Add(vRight)
+		*objs = append(*objs, vRight)
 		return
 	}
 
@@ -549,7 +575,7 @@ func (g *GUIGame) drawWallCell(x, y int, m *maps.Map) {
 		base := canvas.NewRectangle(color.RGBA{55, 15, 70, 255})
 		base.Resize(fyne.NewSize(g.blockSize, g.blockSize))
 		base.Move(fyne.NewPos(originX, originY))
-		g.canvas.Add(base)
+		*objs = append(*objs, base)
 
 		seed := int64(x+1)*10007 + int64(y+1)*1009 + int64(m.Width)*37 + int64(m.Height)*97
 		rnd := rand.New(rand.NewSource(seed))
@@ -590,7 +616,7 @@ func (g *GUIGame) drawWallCell(x, y int, m *maps.Map) {
 			dot := canvas.NewCircle(color.RGBA{shadeR, shadeG, shadeB, 255})
 			dot.Resize(fyne.NewSize(dotSize, dotSize))
 			dot.Move(fyne.NewPos(xPos, yPos))
-			g.canvas.Add(dot)
+			*objs = append(*objs, dot)
 		}
 		return
 	}
@@ -599,35 +625,79 @@ func (g *GUIGame) drawWallCell(x, y int, m *maps.Map) {
 		base := canvas.NewRectangle(color.RGBA{180, 185, 195, 255})
 		base.Resize(fyne.NewSize(g.blockSize, g.blockSize))
 		base.Move(fyne.NewPos(originX, originY))
-		g.canvas.Add(base)
+		*objs = append(*objs, base)
 
 		border := color.RGBA{120, 125, 135, 255}
 		if !hasTop {
 			top := canvas.NewRectangle(border)
 			top.Resize(fyne.NewSize(g.blockSize, line))
 			top.Move(fyne.NewPos(originX, originY))
-			g.canvas.Add(top)
+			*objs = append(*objs, top)
 		}
 
 		if !hasBottom {
 			bottom := canvas.NewRectangle(border)
 			bottom.Resize(fyne.NewSize(g.blockSize, line))
 			bottom.Move(fyne.NewPos(originX, originY+g.blockSize-line))
-			g.canvas.Add(bottom)
+			*objs = append(*objs, bottom)
 		}
 
 		if !hasLeft {
 			left := canvas.NewRectangle(border)
 			left.Resize(fyne.NewSize(line, g.blockSize))
 			left.Move(fyne.NewPos(originX, originY))
-			g.canvas.Add(left)
+			*objs = append(*objs, left)
 		}
 
 		if !hasRight {
 			right := canvas.NewRectangle(border)
 			right.Resize(fyne.NewSize(line, g.blockSize))
 			right.Move(fyne.NewPos(originX+g.blockSize-line, originY))
-			g.canvas.Add(right)
+			*objs = append(*objs, right)
+		}
+		return
+	}
+
+	if mat == "graybricks" || mat == "gray-bricks" || mat == "gray bricks" {
+		base := canvas.NewRectangle(color.RGBA{140, 140, 145, 255})
+		base.Resize(fyne.NewSize(g.blockSize, g.blockSize))
+		base.Move(fyne.NewPos(originX, originY))
+		*objs = append(*objs, base)
+
+		// Lighter edges for 3D effect
+		highlight := color.RGBA{170, 170, 175, 255}
+		shadow := color.RGBA{100, 100, 105, 255}
+
+		// Top highlight
+		if !hasTop {
+			top := canvas.NewRectangle(highlight)
+			top.Resize(fyne.NewSize(g.blockSize, line*0.5))
+			top.Move(fyne.NewPos(originX, originY))
+			*objs = append(*objs, top)
+		}
+
+		// Bottom shadow
+		if !hasBottom {
+			bottom := canvas.NewRectangle(shadow)
+			bottom.Resize(fyne.NewSize(g.blockSize, line*0.5))
+			bottom.Move(fyne.NewPos(originX, originY+g.blockSize-line*0.5))
+			*objs = append(*objs, bottom)
+		}
+
+		// Left highlight
+		if !hasLeft {
+			left := canvas.NewRectangle(highlight)
+			left.Resize(fyne.NewSize(line*0.5, g.blockSize))
+			left.Move(fyne.NewPos(originX, originY))
+			*objs = append(*objs, left)
+		}
+
+		// Right shadow
+		if !hasRight {
+			right := canvas.NewRectangle(shadow)
+			right.Resize(fyne.NewSize(line*0.5, g.blockSize))
+			right.Move(fyne.NewPos(originX+g.blockSize-line*0.5, originY))
+			*objs = append(*objs, right)
 		}
 		return
 	}
@@ -635,7 +705,7 @@ func (g *GUIGame) drawWallCell(x, y int, m *maps.Map) {
 	defaultWall := canvas.NewRectangle(color.RGBA{0, 0, 255, 255})
 	defaultWall.Resize(fyne.NewSize(g.blockSize, g.blockSize))
 	defaultWall.Move(fyne.NewPos(originX, originY))
-	g.canvas.Add(defaultWall)
+	*objs = append(*objs, defaultWall)
 }
 
 func (g *GUIGame) monsterTeethBlinkSwap(moving bool) bool {
@@ -706,7 +776,7 @@ func (g *GUIGame) capturePositions() (renderPos, []renderPos) {
 }
 
 func (g *GUIGame) animateMovement(infoLabel *widget.Label, startPlayer, endPlayer renderPos, startMonsters, endMonsters []renderPos) {
-	steps := 4
+	steps := 2 // Reduced from 4 to cut rendering work in half
 	stepDuration := g.tickInterval / time.Duration(steps)
 	if stepDuration < 10*time.Millisecond {
 		stepDuration = 10 * time.Millisecond
@@ -939,6 +1009,9 @@ func (g *GUIGame) calculateBlockSize() {
 	if g.blockSize < minBlockSize {
 		g.blockSize = minBlockSize
 	}
+
+	// Invalidate cache if block size changed
+	g.cachedMapRender = nil
 
 	// Calculate actual map dimensions in pixels
 	mapPixelWidth := float32(m.Width) * g.blockSize
