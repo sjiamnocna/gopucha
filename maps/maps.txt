@@ -16,7 +16,7 @@ M--O---O---OO----OOOO--M
 ----OO-------------OO---
 ---OO------------OOO----
 ----OO---------OOO------
-M--OOOOOOOOP-OOOOOOOO--M
+M--OOOOOOOOP-OOOOOOOO---
 
 ---
 name: Mobby Dick

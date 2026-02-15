@@ -1357,6 +1357,7 @@ func (g *GUIGame) startGameLoop() {
 				}
 				// Pause finished, move to next level
 				g.game.LoadLevel(g.game.CurrentLevel + 1)
+				g.cachedMapRender = nil // Invalidate cache for new level
 				g.state = StateLevelStart
 				g.countdownStart = time.Now()
 				g.pauseTicks = 0
