@@ -414,8 +414,8 @@ func (g *GUIGame) setupGameUI() {
 	g.cachedMapRender = nil
 
 	// Info panel - left side stats
-	g.infoLabel = widget.NewLabel(fmt.Sprintf("Level: %d | Score: %d | Dots: %d",
-		g.game.CurrentLevel+1, g.game.Score, g.game.CurrentMap.CountDots()))
+	g.infoLabel = widget.NewLabel(fmt.Sprintf("%s | Score: %d | Dots: %d",
+		g.levelDisplayName(), g.game.Score, g.game.CurrentMap.CountDots()))
 	g.infoLabel.TextStyle = fyne.TextStyle{Bold: true}
 
 	g.controlsLabel = widget.NewLabel("Controls: Arrow Keys to move | F2 restart | +/- zoom | ESC settings")
@@ -619,8 +619,8 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 	g.drawPacman(mapOriginX+playerPos.x*g.blockSize+g.blockSize*0.05, mapOriginY+playerPos.y*g.blockSize+g.blockSize*0.05, g.blockSize*0.9, g.game.Player.Direction)
 
 	// Update info
-	infoLabel.SetText(fmt.Sprintf("Level: %d | Score: %d | Dots: %d",
-		g.game.CurrentLevel+1, g.game.Score, g.game.CurrentMap.CountDots()))
+	infoLabel.SetText(fmt.Sprintf("%s | Score: %d | Dots: %d",
+		g.levelDisplayName(), g.game.Score, g.game.CurrentMap.CountDots()))
 
 	// Update lives display
 	g.livesDisplay.Objects = nil
@@ -652,6 +652,17 @@ func (g *GUIGame) updateControlsVisibility() {
 func (g *GUIGame) mapOrigin() (float32, float32) {
 	borderOffset := float32(borderBlocks) * g.blockSize
 	return g.offsetX + borderOffset, g.offsetY + borderOffset
+}
+
+func (g *GUIGame) levelDisplayName() string {
+	if g.game == nil || g.game.CurrentMap == nil {
+		return ""
+	}
+	name := strings.TrimSpace(g.game.CurrentMap.Name)
+	if name == "" {
+		return fmt.Sprintf("Level %d", g.game.CurrentLevel+1)
+	}
+	return name
 }
 
 func (g *GUIGame) currentStatusBarHeight() float32 {

@@ -24,25 +24,38 @@ The monsters **can only change direction when they crash to walls or themselves*
 
 - **GUI Mode**: Fyne-based interface
 - **Custom Map Loading**: Load maps from TXT map files
-- **Map Generator**: Generate random coherent maps
+- **Level Metadata**: Per-level name, material, monster count, and speed modifier
 - **GUI Features**:
-  - Pre-game settings: adjust speed, select map
-  - Arrow key controls
-  - Zoom in/out with +/- keys or CTRL+Scroll
-  - Visual graphics with colored blocks
-- **4 Monsters**: Red squares that turn only when hitting walls and pick the shortest available path toward the Pampuch figure
-- **Score Tracking**: Earn points for collecting dots
-- **Progressive Difficulty**: Multiple levels with increasing challenge
+  - Settings dialog (speed + map selection)
+  - Arrow key movement with input buffering
+  - Zoom in/out with +/- keys
+  - Visual wall materials and a border that matches the current level
+- **Monsters**: Count and starts based on map data; movement is a simple chase heuristic
+- **Score & Lives**: Collect dots for points and avoid monsters
 
 ## Map Format
 
 Maps are defined in TXT files using the following characters:
-- `O`, `o`, or `0`: Walls/masonry (blocks)
-- `-`: Empty space with dots for the player to collect
+- `O`, `o`, or `0`: Walls
+- `-`: Dot (collectible)
+- `P`: Player start
+- `M`: Monster start
+- Space or any other character: Empty space
 
 **Important**: All levels in a single file must have the same dimensions (width x height). Different sizes will result in an error.
 
 Multiple levels can be defined in a single file, separated by a line containing only `---`.
+
+### Metadata
+
+Optional metadata lines can appear before the grid:
+
+- `name`: Level name shown in the status bar
+- `material`: Wall material (`classic`, `bricks`, `graybricks`, `purpledots`, etc.)
+- `playerStart`: `x,y` player start position
+- `monsterStart` / `monsterStarts`: `x,y` or `x1,y1; x2,y2` monster starts
+- `monsters`: Monster count (ignored if explicit monster starts are given)
+- `speedModifier`: Multiplier for movement speed (0.5 to 2.0)
 
 ### Example Map
 
@@ -86,11 +99,6 @@ make run             # Build and run with default map
 ./gopucha maps/maps.txt
 ```
 
-### Build (manual - fallback)
-```bash
-go build -o gopucha ./cmd/gopucha
-```
-
 ### Build (manual)
 ```bash
 go build -o gopucha ./cmd/gopucha
@@ -113,45 +121,32 @@ Run with a specific map file:
 ```
 
 GUI mode features:
-- Settings dialog before game starts
-- Speed slider (50-500ms tick rate)
+- Settings dialog (ESC)
+- Speed slider
 - Map file selector
-- Visual graphics with color blocks
-- Zoom controls
-
-### Map Generator
-Generate random maps:
-```bash
-go build -o bin/mapgen ./cmd/mapgen
-./bin/mapgen -width 24 -height 10 -levels 3 -output custom_map.txt
-```
-
-Options:
-- `-width`: Map width (must be even, minimum 10)
-- `-height`: Map height (minimum 5)
-- `-levels`: Number of levels to generate
-- `-output`: Output file path
+- Visual wall materials and border
+- Zoom controls (+/-)
 
 ## Controls
 
 ### GUI Mode
 - `Arrow Keys`: Move player
 - `+/-`: Zoom in/out
-- `ESC`: Quit game
+- `ESC`: Open settings
+- `F2`: Restart
 
 ## Gameplay
 
 - Collect all dots to advance to the next level
 - Avoid the monsters (red squares)
-- Monsters only turn when they hit a wall, then choose the shortest available path toward the Pampuch figure
+- Monsters choose a direction when blocked, preferring the axis with the larger distance to the player
 - Game ends when you collide with a monster
 - Win by completing all levels
 
 ## Example Maps
 
-Two example map files are included in the `maps/` directory:
-- `maps/simple.txt`: A small simple map for testing
-- `maps/maps.txt`: Three progressively challenging levels (24x10 each)
+Example maps are included in the `maps/` directory:
+- `maps/maps.txt`: Multiple levels with different materials
 
 By default, the game loads `maps/maps.txt`. You can specify just the filename (e.g., `simple.txt`) and the game will automatically look in the `maps/` directory.
 
@@ -159,11 +154,9 @@ By default, the game loads `maps/maps.txt`. You can specify just the filename (e
 
 ```
 gopucha/
-├── cmd/
-│   ├── gopucha/    # Main game executable
-│   └── mapgen/     # Map generator tool
+├── cmd/gopucha/    # Main game executable
+├── internal/       # Game logic and GUI
 ├── maps/           # Example map files
-├── *.go            # Game logic (gopucha package)
 └── Makefile        # Build automation
 ```
 
