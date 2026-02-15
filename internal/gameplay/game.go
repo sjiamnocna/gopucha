@@ -215,6 +215,9 @@ func (g *Game) Update() {
 		return
 	}
 
+	// Clear last-tick flags so UI doesn't stay in death/pause state.
+	g.LifeLost = false
+
 	// Store monster positions before they move
 	oldMonsterPos := make([][2]int, len(g.Monsters))
 	for i := range g.Monsters {

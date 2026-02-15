@@ -11,6 +11,7 @@ const (
 	maxBlockSize              = 50
 	minWindowSize             = 640
 	statusBarHeight           = 80
-	defaultTickInterval       = 220 * time.Millisecond
+	defaultTickInterval       = 150 * time.Millisecond
 	monsterTeethBlinkInterval = 150 * time.Millisecond
+	borderBlocks              = 1
 )

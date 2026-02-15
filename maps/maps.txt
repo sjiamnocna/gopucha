@@ -1,55 +1,151 @@
-name: Author
+name: Jancsi.cz
 material: classic
-monsters: 4
-
-------------------------------
----O---O---O---O---OOO OOOO O-
----O--O-O--OO--O--OO---O----O-
----O-O---O-O-O-O-OO----OOOO-O-
--O-O-OOO-O-O--OO--OO------O-O-
--OOO-O---O-O--OO---OOO-OOOO-O-
-------------------------------
-OOO------OOO--OOOOO----OOOOOOO
---------OO-------OO-----------
--------OO-------OO--------OOOO
----OOO--OO-----OO-------------
----OOO---OOO--OOOOO---------OO
----------------------OOOO-----
-
-
+M----------------------M
+------------------------
+--OO----------------OO--
+------------------------
+-OOO-O-O-O-O-OOO-OOO-OOO
+---O-O-O-OO--O---O------
+---O-OOO-OOO-O---OOO--O-
+-O-O-O-O--OO-O-----O--O-
+-OO--O-O-O-O-OOO-OOO-OOO
+-----------OOO-OOO------
+-----------O-----O------
+-----------O----O-------
+-----------O---O--------
+-------O---OOO-OOO------
+----OO--------------OO--
+M-----------P----------M
 ---
-name: Pampuch Original (Resized)
+name: Four Rooms Lite
+material: bricks
+M----------------------M
+-OOOOOO------OOOOOO-----
+-O-----------O----------
+-O----O------O----O-----
+------O-----------O-----
+-OOOOOO---OO0OOOOOO-----
+--------O--OO--O--------
+--------O------O--------
+-----OOOO--OO--OOOO-----
+-----O----O--O----O-----
+-----O----O--O----O-----
+-----O----O--O----O-----
+-----OOOOOO--OOOOOO-----
+----------P-------------
+------------------------
+M----------------------M
+---
+name: Easy Loop
 material: purpledots
-monsters: 3
-------------------------------
---OOOO--OO---OO---OO---OOO----
---O--O--O----O----O----O-O----
---OO-O--OO---OO---OO---O-O----
-------OOO----------OOO--------
---OO--O---O--OOOO--O---O--OO--
---OO--O---O-----O--O---O--OO--
---OO--OOOOO--OOOO--OOOOO--OO--
-------O------------OOO--------
---OOO---OO---OO---OO---OOO----
---O-----O----O----O-----O-----
---OOO---OO---OO---OO---OOO----
-------------------------------
-
-
+M----------------------M
+-O-OOOOOOOO--OOOOOOOO-O-
+-O-O------O--O------O-O-
+-O-O-OOOO-O--O-OOOO-O-O-
+---O-O----O--O----O-O---
+-O-O-O-OO-O--O-OO-O-O-O-
+-O-O-O-O--O--O--O-O-O-O-
+-O---O-O-----P--O-O---O-
+-O-O-O-O--O--O--O-O-O-O-
+-O-O-O-OO-O--O-OO-O-O-O-
+---O-O----O--O----O-O---
+-O-O-OOOO-O--O-OOOO-O-O-
+-O-O------O--O------O-O-
+-O-OOOOOOOO--OOOOOOOO-O-
+------------------------
+M----------------------M
 ---
-name: Maze
-material: brick
-monsters: 4
-------------------------------
----O---O---O---O---OOO--------
----O--O-O--OO--O--OO----------
----O-O---O-O-O-O-OO-----OOOO--
--O-O-OOO-O-O--OO--OO----------
--OOO-O---O-O--OO---OOO--------
---------------OO--------------
--OOOO O--OOO------OOO--OOOOO-O
--O----O---OOOO---OO-------OO-O
--OOOO-O---------OO-------OO---
-----O-O---OOOO--OO------OO---O
--OOOO-O------O---OOOO--OOOOO-O
-----------OO------------------
+name: Grave robber
+material: bricks
+----OOOOOOOO---OOOOOO---
+O----------OO----------O
+O-OOOO-OOO-OO-OOOO-OOO-O
+O-O----O------O----O---O
+O-O-OO-OOOOOO-O-OO-O-O-O
+O-O-OO------O-O-OO-O-O-O
+O-OOOO-OOOO-O-OOOO-O-O-O
+O------O----O------O-O-O
+OOOOO-O-O-OOOOOO-O-O-O-O
+O---O-O-O------O-O-O---O
+O-O-O-O-OOOOOO-O-O-OOOOO
+O-O---O----O----O-O----O
+O-OOOOOOOO-O-OOOO-OOOO-O
+O-M--------P----O----M-O
+O-------O----O--O------O
+OO---O--O----O----------
+---
+name: Intro
+material: bricks
+M--O---O---OO----OOOO--M
+---O--OOO--O-O-O-O----OO
+-O-O-O---O-O--OO-O------
+-OOO-O---O-O---O-OOOO---
+-------------O----------
+--OOOOOOO---OOO---------
+--OO---------O----------
+--OOOOOOO---OOO---------
+-------OO----O----OOO---
+--OOOOOOO---OOO---OOO---
+------------------------
+---OOOOOOOO--OOOOOOOO---
+----OO-------------OO---
+---OO------------OOO----
+----OO---------OOO------
+M--OOOOOOOOP-OOOOOOOO---
+---
+name: Mobby Dick
+material: purpledots
+P------O-O-O-O-O-O-O-O-O
+-O-OO-------------------
+------O-O-O-O-O-O-O-O-OO
+OOOOO-OOOOOOOOOOOOOOOOOO
+------O-O-O-O-O-O-O-O-OO
+-O-O-------------------M
+-----O-O-O-O-O-O-O-O-O-O
+OOOO-OOOOOOOOOOOOOOOOOOO
+-----O-O-O-O-O-O-O-O-O-O
+-OO--------------------M
+----O-O-O-O-O-O-O-O-O-OO
+OOO-OOOOOOOOOOOOOOOOOOOO
+----O-O-O-O-O-O-O-O-O-OO
+-O----------------------
+-O-O-O-O-O-O-O-O-O-O-O-O
+-----------------------M
+---
+name: Archeolog
+material: graybrick
+OM--------O---O-------MO
+O-OOOOOOOOO---OOOOOOOO-O
+O--OO-------O-----OO---O
+O--O--OOOOO-OOOOO--O---O
+O-----O---O-----O------O
+O-O---O-----O---O---OO-O
+O---O-O-OOOOOOO-O-O----O
+OO----O-O-----O-O-----OO
+O-----O---O---O-O------O
+O----OO-OOO-OOO-OO-----O
+O--O--O---------O--O---O
+O-----OOOOOOOOOOO------O
+O--OO------O------OO---O
+OOOO-------O-------OOOOO
+O---------OOO----------O
+OP---O-----------O----MO
+---
+name: Sandokan
+material: classic
+M-------O----------O---M
+--------O----------O----
+--------O----------O----
+OOOO----O----------O----
+------------------------
+-------------------OOOOO
+------------------------
+M------------O---OOO----
+------------------------
+------------------------
+OOOOOOOOOOO-------------
+------------P--------OOO
+-----O------------------
+-----O------------------
+-----O----------O-------
+M----O----OOOOOOO------M

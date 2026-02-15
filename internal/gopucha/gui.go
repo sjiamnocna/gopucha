@@ -823,20 +823,6 @@ func (g *GUIGame) startMouthAnimation() {
 	}()
 }
 
-func (g *GUIGame) minF(a, b float32) float32 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func (g *GUIGame) maxF(a, b float32) float32 {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 func (g *GUIGame) renderGameWithCountdown(infoLabel *widget.Label) {
 	// Render the same as normal game
 	g.renderGame(infoLabel)

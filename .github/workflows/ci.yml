@@ -8,23 +8,50 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Go fmt check
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "Unformatted files:"
+            echo "$unformatted"
+            exit 1
+          fi
+        shell: bash
+
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             artifact: gopucha-linux
             bin: gopucha-linux
+            archive: gopucha-linux.tar.gz
           - os: windows-latest
             artifact: gopucha-windows
             bin: gopucha-windows.exe
+            archive: gopucha-windows.zip
           - os: macos-latest
             artifact: gopucha-macos
             bin: gopucha-macos
+            archive: gopucha-macos.tar.gz
+    needs: fmt
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,32 +75,61 @@ jobs:
             sleep 10
           done
 
-      - name: Go fmt check
-        run: |
-          unformatted=$(gofmt -l .)
-          if [ -n "$unformatted" ]; then
-            echo "Unformatted files:"
-            echo "$unformatted"
-            exit 1
-          fi
-        shell: bash
-
       - name: Build
         run: |
           mkdir -p bin
-          go build -tags gui -o "bin/${{ matrix.bin }}" ./cmd/gopucha
+          go build \
+          -tags gui \
+          -trimpath \
+          -buildvcs=false \
+          -ldflags="-s -w -X 'main.version=${GITHUB_REF_NAME}' -X 'main.commit=${GITHUB_SHA}'" \
+          -o "bin/${{ matrix.bin }}" ./cmd/gopucha
         shell: bash
+
+      - name: Package (tar.gz)
+        if: matrix.os != 'windows-latest'
+        run: |
+          mkdir -p dist/package
+          cp "bin/${{ matrix.bin }}" "dist/package/${{ matrix.bin }}"
+          cp -r maps "dist/package/"
+          cd dist
+          tar -czf "${{ matrix.archive }}" -C package .
+          cd ..
+          rm -rf dist/package
+        shell: bash
+
+      - name: Package (zip)
+        if: matrix.os == 'windows-latest'
+        run: |
+          mkdir -p dist
+          Compress-Archive -Path "bin/${{ matrix.bin }}", "maps" -DestinationPath "dist/${{ matrix.archive }}"
+        shell: pwsh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: bin/${{ matrix.bin }}
+          path: dist/${{ matrix.archive }}
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    needs: [fmt, build]
+    if: ${{ always() }}
+    steps:
+      - name: Fail if upstream jobs failed
+        run: |
+          echo "fmt:   ${{ needs.fmt.result }}"
+          echo "build: ${{ needs.build.result }}"
+          test "${{ needs.fmt.result }}" = "success"
+          test "${{ needs.build.result }}" = "success"
+
 
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    needs: build
+    needs:
+      - fmt
+      - build
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -115,6 +171,6 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
           files: |
-            dist/**/gopucha-linux
-            dist/**/gopucha-macos
-            dist/**/gopucha-windows.exe
+            dist/**/gopucha-linux.tar.gz
+            dist/**/gopucha-macos.tar.gz
+            dist/**/gopucha-windows.zip

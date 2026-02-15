@@ -328,7 +328,7 @@ func validateMap(m *Map) error {
 	for y := 0; y < m.Height; y++ {
 		for x := 0; x < m.Width; x++ {
 			if m.Cells[y][x] == Dot && !reachable[y][x] {
-				return fmt.Errorf("map has unreachable dot at (%d,%d)", x, y)
+				return fmt.Errorf("map '%s': unreachable dot at row %d, col %d", m.Name, y, x)
 			}
 		}
 	}
@@ -337,7 +337,7 @@ func validateMap(m *Map) error {
 	for y := 0; y < m.Height; y++ {
 		for x := 0; x < m.Width; x++ {
 			if m.Cells[y][x] == Dot && !dotReachable[y][x] {
-				return fmt.Errorf("map has separated dots; dot at (%d,%d) is disconnected", x, y)
+				return fmt.Errorf("map '%s': separated dots; dot at row %d, col %d is disconnected", m.Name, y, x)
 			}
 		}
 	}
