@@ -1,47 +1,47 @@
-name: Sandokan
-material: brick
+name: Intro
+material: bricks
 
-M-------O----------O---M
---------O----------O----
---------O----------O----
-OOOO----O----------O----
+M--O---O---OO----OOOO--M
+---O--OOO--O-O-O-O----OO
+-O-O-O---O-O--OO-O------
+-OOO-O---O-O---O-OOOO---
+-------------O----------
+--OOOOOOO---OOO---------
+--OO---------O----------
+--OOOOOOO---OOO---------
+-------OO----O----OOO---
+--OOOOOOO---OOO---OOO---
 ------------------------
--------------------OOOOO
-------------------------
-M------------O---OOO---M
-------------------------
-------------------------
-OOOOOOOOOOO-------------
-------------P--------OOO
------O------------------
------O------------------
------O----------O-------
-M----O----OOOOOOO------M
+---OOOOOOOO--OOOOOOOO---
+----OO-------------OO---
+---OO------------OOO----
+----OO---------OOO------
+M--OOOOOOOOP-OOOOOOOO--M
 
 ---
 name: Mobby Dick
 material: purpledots
 
--------O-O-O-O-O-O-O-O-O
+P------O-O-O-O-O-O-O-O-O
 -O-OO-------------------
 ------O-O-O-O-O-O-O-O-OO
 OOOOO-OOOOOOOOOOOOOOOOOO
 ------O-O-O-O-O-O-O-O-OO
--O-O--------------------
+-O-O-------------------M
 -----O-O-O-O-O-O-O-O-O-O
 OOOO-OOOOOOOOOOOOOOOOOOO
 -----O-O-O-O-O-O-O-O-O-O
--OO---------------------
+-OO--------------------M
 ----O-O-O-O-O-O-O-O-O-OO
 OOO-OOOOOOOOOOOOOOOOOOOO
 ----O-O-O-O-O-O-O-O-O-OO
 -O----------------------
 -O-O-O-O-O-O-O-O-O-O-O-O
-------------------------
+-----------------------M
 
 ---
 name: Archeolog
-material: classic
+material: graybrick
 
 OM--------O---O-------MO
 O-OOOOOOOOO---OOOOOOOO-O
@@ -59,3 +59,24 @@ O--OO------O------OO---O
 OOOO-------O-------OOOOO
 O---------OOO----------O
 OP---O-----------O----MO
+
+---
+name: Sandokan
+material: classic
+
+M-------O----------O---M
+--------O----------O----
+--------O----------O----
+OOOO----O----------O----
+------------------------
+-------------------OOOOO
+------------------------
+M------------O---OOO----
+------------------------
+------------------------
+OOOOOOOOOOO-------------
+------------P--------OOO
+-----O------------------
+-----O------------------
+-----O----------O-------
+M----O----OOOOOOO------M

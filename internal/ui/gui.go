@@ -167,6 +167,11 @@ func (g *GUIGame) showSettings() {
 			if d != nil {
 				d.Hide()
 			}
+		} else if ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
+			handleClose(true)
+			if d != nil {
+				d.Hide()
+			}
 		}
 	})
 	stack := container.NewStack(content, key)
@@ -174,6 +179,31 @@ func (g *GUIGame) showSettings() {
 	d = dialog.NewCustomConfirm("Settings", "Apply", "Cancel", stack, func(apply bool) {
 		handleClose(apply)
 	}, g.window)
+	
+	// Set up canvas-level key handler for the dialog
+	originalHandler := g.window.Canvas().OnTypedKey()
+	g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+		if ev.Name == fyne.KeyEscape {
+			handleClose(false)
+			d.Hide()
+			if originalHandler != nil {
+				g.window.Canvas().SetOnTypedKey(originalHandler)
+			}
+		} else if ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
+			handleClose(true)
+			d.Hide()
+			if originalHandler != nil {
+				g.window.Canvas().SetOnTypedKey(originalHandler)
+			}
+		}
+	})
+	
+	d.SetOnClosed(func() {
+		if originalHandler != nil {
+			g.window.Canvas().SetOnTypedKey(originalHandler)
+		}
+	})
+	
 	d.Show()
 	g.window.Canvas().Focus(key)
 }
@@ -284,22 +314,45 @@ func (g *GUIGame) showMapErrorAndClose(err error) {
 		content.Add(selectLabel)
 		content.Add(mapSelect)
 	}
-	key := newKeyCatcher(func(ev *fyne.KeyEvent) {
-		g.window.Close()
-	})
-	stack := container.NewStack(content, key)
-
+	
 	if len(mapFiles) <= 1 {
-		d := dialog.NewCustom("Map Error", "Exit", stack, g.window)
+		var d dialog.Dialog
+		key := newKeyCatcher(func(ev *fyne.KeyEvent) {
+			if ev.Name == fyne.KeyEscape || ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
+				if d != nil {
+					d.Hide()
+				}
+				g.window.Close()
+			}
+		})
+		stack := container.NewStack(content, key)
+		
+		d = dialog.NewCustom("Map Error", "Exit", stack, g.window)
+		
+		originalHandler := g.window.Canvas().OnTypedKey()
+		g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+			if ev.Name == fyne.KeyEscape || ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
+				d.Hide()
+				g.window.Close()
+				if originalHandler != nil {
+					g.window.Canvas().SetOnTypedKey(originalHandler)
+				}
+			}
+		})
+		
 		d.SetOnClosed(func() {
 			g.window.Close()
+			if originalHandler != nil {
+				g.window.Canvas().SetOnTypedKey(originalHandler)
+			}
 		})
 		d.Show()
 		g.window.Canvas().Focus(key)
 		return
 	}
 
-	d := dialog.NewCustomConfirm("Map Error", "Load selected", "Exit", stack, func(apply bool) {
+	var d *dialog.ConfirmDialog
+	handleSelect := func(apply bool) {
 		if apply {
 			if mapSelect.Selected != "" {
 				g.mapFile = mapSelect.Selected
@@ -308,7 +361,48 @@ func (g *GUIGame) showMapErrorAndClose(err error) {
 			}
 		}
 		g.window.Close()
-	}, g.window)
+	}
+	
+	key := newKeyCatcher(func(ev *fyne.KeyEvent) {
+		if ev.Name == fyne.KeyEscape {
+			handleSelect(false)
+			if d != nil {
+				d.Hide()
+			}
+		} else if ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
+			handleSelect(true)
+			if d != nil {
+				d.Hide()
+			}
+		}
+	})
+	stack := container.NewStack(content, key)
+
+	d = dialog.NewCustomConfirm("Map Error", "Load selected", "Exit", stack, handleSelect, g.window)
+	
+	originalHandler := g.window.Canvas().OnTypedKey()
+	g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+		if ev.Name == fyne.KeyEscape {
+			handleSelect(false)
+			d.Hide()
+			if originalHandler != nil {
+				g.window.Canvas().SetOnTypedKey(originalHandler)
+			}
+		} else if ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
+			handleSelect(true)
+			d.Hide()
+			if originalHandler != nil {
+				g.window.Canvas().SetOnTypedKey(originalHandler)
+			}
+		}
+	})
+	
+	d.SetOnClosed(func() {
+		if originalHandler != nil {
+			g.window.Canvas().SetOnTypedKey(originalHandler)
+		}
+	})
+	
 	d.Show()
 	g.window.Canvas().Focus(key)
 }
@@ -659,46 +753,40 @@ func (g *GUIGame) drawWallCellInto(x, y int, m *maps.Map, objs *[]fyne.CanvasObj
 	}
 
 	if mat == "graybricks" || mat == "gray-bricks" || mat == "gray bricks" {
-		base := canvas.NewRectangle(color.RGBA{140, 140, 145, 255})
+		base := canvas.NewRectangle(color.RGBA{150, 155, 160, 255})
 		base.Resize(fyne.NewSize(g.blockSize, g.blockSize))
 		base.Move(fyne.NewPos(originX, originY))
 		*objs = append(*objs, base)
 
-		// Lighter edges for 3D effect
-		highlight := color.RGBA{170, 170, 175, 255}
-		shadow := color.RGBA{100, 100, 105, 255}
-
-		// Top highlight
+		lineColor := color.RGBA{60, 65, 70, 255}
 		if !hasTop {
-			top := canvas.NewRectangle(highlight)
-			top.Resize(fyne.NewSize(g.blockSize, line*0.5))
+			top := canvas.NewRectangle(lineColor)
+			top.Resize(fyne.NewSize(g.blockSize, line))
 			top.Move(fyne.NewPos(originX, originY))
 			*objs = append(*objs, top)
 		}
 
-		// Bottom shadow
 		if !hasBottom {
-			bottom := canvas.NewRectangle(shadow)
-			bottom.Resize(fyne.NewSize(g.blockSize, line*0.5))
-			bottom.Move(fyne.NewPos(originX, originY+g.blockSize-line*0.5))
+			bottom := canvas.NewRectangle(lineColor)
+			bottom.Resize(fyne.NewSize(g.blockSize, line))
+			bottom.Move(fyne.NewPos(originX, originY+g.blockSize-line))
 			*objs = append(*objs, bottom)
 		}
 
-		// Left highlight
-		if !hasLeft {
-			left := canvas.NewRectangle(highlight)
-			left.Resize(fyne.NewSize(line*0.5, g.blockSize))
-			left.Move(fyne.NewPos(originX, originY))
-			*objs = append(*objs, left)
-		}
+		mid := canvas.NewRectangle(lineColor)
+		mid.Resize(fyne.NewSize(g.blockSize, line))
+		mid.Move(fyne.NewPos(originX, originY+g.blockSize/2-line/2))
+		*objs = append(*objs, mid)
 
-		// Right shadow
-		if !hasRight {
-			right := canvas.NewRectangle(shadow)
-			right.Resize(fyne.NewSize(line*0.5, g.blockSize))
-			right.Move(fyne.NewPos(originX+g.blockSize-line*0.5, originY))
-			*objs = append(*objs, right)
-		}
+		vLeft := canvas.NewRectangle(lineColor)
+		vLeft.Resize(fyne.NewSize(line, g.blockSize/2))
+		vLeft.Move(fyne.NewPos(originX+g.blockSize*0.33, originY))
+		*objs = append(*objs, vLeft)
+
+		vRight := canvas.NewRectangle(lineColor)
+		vRight.Resize(fyne.NewSize(line, g.blockSize/2))
+		vRight.Move(fyne.NewPos(originX+g.blockSize*0.66, originY+g.blockSize/2))
+		*objs = append(*objs, vRight)
 		return
 	}
 
@@ -1090,7 +1178,12 @@ func (g *GUIGame) handleKeyPress(ev *fyne.KeyEvent, infoLabel *widget.Label) {
 func (g *GUIGame) handleF2NewGame() {
 	// If game is in progress, show confirmation dialog
 	if g.state == StatePlaying || g.state == StateLevelStart || g.state == StateLevelComplete {
-		dialog.ShowConfirm("New Game", "Start a new game? Current progress will be lost.", func(ok bool) {
+		msg := widget.NewLabel("Start a new game? Current progress will be lost.")
+		msg.Wrapping = fyne.TextWrapWord
+		content := container.NewVBox(msg)
+		
+		var d *dialog.ConfirmDialog
+		handleChoice := func(ok bool) {
 			if ok {
 				g.restartGame()
 			}
@@ -1098,7 +1191,50 @@ func (g *GUIGame) handleF2NewGame() {
 			if g.keyCatcher != nil {
 				g.window.Canvas().Focus(g.keyCatcher)
 			}
-		}, g.window)
+		}
+		
+		key := newKeyCatcher(func(ev *fyne.KeyEvent) {
+			if ev.Name == fyne.KeyEscape {
+				handleChoice(false)
+				if d != nil {
+					d.Hide()
+				}
+			} else if ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
+				handleChoice(true)
+				if d != nil {
+					d.Hide()
+				}
+			}
+		})
+		stack := container.NewStack(content, key)
+		
+		d = dialog.NewCustomConfirm("New Game", "Yes", "No", stack, handleChoice, g.window)
+		
+		originalHandler := g.window.Canvas().OnTypedKey()
+		g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+			if ev.Name == fyne.KeyEscape {
+				handleChoice(false)
+				d.Hide()
+				if originalHandler != nil {
+					g.window.Canvas().SetOnTypedKey(originalHandler)
+				}
+			} else if ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
+				handleChoice(true)
+				d.Hide()
+				if originalHandler != nil {
+					g.window.Canvas().SetOnTypedKey(originalHandler)
+				}
+			}
+		})
+		
+		d.SetOnClosed(func() {
+			if originalHandler != nil {
+				g.window.Canvas().SetOnTypedKey(originalHandler)
+			}
+		})
+		
+		d.Show()
+		g.window.Canvas().Focus(key)
 	} else {
 		// Game is over or won, just restart
 		g.restartGame()
@@ -1149,7 +1285,40 @@ func (g *GUIGame) startGameLoop() {
 				g.ticker.Stop()
 				g.state = StateWon
 				fyne.Do(func() {
-					dialog.ShowInformation("You Won!", fmt.Sprintf("Final Score: %d", g.game.Score), g.window)
+					msg := widget.NewLabel(fmt.Sprintf("Final Score: %d", g.game.Score))
+					msg.Alignment = fyne.TextAlignCenter
+					content := container.NewVBox(msg)
+					
+					var d dialog.Dialog
+					key := newKeyCatcher(func(ev *fyne.KeyEvent) {
+						if ev.Name == fyne.KeyEscape || ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
+							if d != nil {
+								d.Hide()
+							}
+						}
+					})
+					stack := container.NewStack(content, key)
+					
+					d = dialog.NewCustom("You Won!", "OK", stack, g.window)
+					
+					originalHandler := g.window.Canvas().OnTypedKey()
+					g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+						if ev.Name == fyne.KeyEscape || ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
+							d.Hide()
+							if originalHandler != nil {
+								g.window.Canvas().SetOnTypedKey(originalHandler)
+							}
+						}
+					})
+					
+					d.SetOnClosed(func() {
+						if originalHandler != nil {
+							g.window.Canvas().SetOnTypedKey(originalHandler)
+						}
+					})
+					
+					d.Show()
+					g.window.Canvas().Focus(key)
 				})
 				return
 			}
