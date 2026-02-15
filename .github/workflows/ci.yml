@@ -18,13 +18,13 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact: gopucha-linux
-            bin: gopucha
+            bin: gopucha-linux
           - os: windows-latest
             artifact: gopucha-windows
-            bin: gopucha.exe
+            bin: gopucha-windows.exe
           - os: macos-latest
             artifact: gopucha-macos
-            bin: gopucha
+            bin: gopucha-macos
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -106,11 +106,15 @@ jobs:
         with:
           path: dist
 
+      - name: List dist
+        run: ls -R dist
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
           files: |
-            dist/**/gopucha
-            dist/**/gopucha.exe
+            dist/**/gopucha-linux
+            dist/**/gopucha-macos
+            dist/**/gopucha-windows.exe
