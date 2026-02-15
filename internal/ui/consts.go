@@ -13,4 +13,5 @@ const (
 	statusBarHeight           = 80
 	defaultTickInterval       = 220 * time.Millisecond
 	monsterTeethBlinkInterval = 150 * time.Millisecond
+	borderBlocks              = 1
 )

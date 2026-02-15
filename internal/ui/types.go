@@ -29,12 +29,14 @@ type GUIGame struct {
 	offsetX               float32 // X offset for centering the game
 	offsetY               float32 // Y offset for centering the game
 	canvas                *fyne.Container
+	statusBarHeight       float32
 	keyCatcher            *keyCatcher
 	ticker                *time.Ticker
 	tickInterval          time.Duration
 	mapFile               string
 	infoLabel             *widget.Label
 	controlsLabel         *widget.Label
+	livesDisplay          *fyne.Container // Hearts display for lives
 	state                 GameState
 	countdownStart        time.Time
 	pauseTicks            int

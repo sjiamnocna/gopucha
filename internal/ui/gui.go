@@ -17,6 +17,7 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
@@ -412,9 +413,9 @@ func (g *GUIGame) setupGameUI() {
 	g.canvas = container.NewWithoutLayout()
 	g.cachedMapRender = nil
 
-	// Info panel with styled background
-	g.infoLabel = widget.NewLabel(fmt.Sprintf("Level: %d | Score: %d | Lives: %d | Dots: %d",
-		g.game.CurrentLevel+1, g.game.Score, g.game.Lives, g.game.CurrentMap.CountDots()))
+	// Info panel - left side stats
+	g.infoLabel = widget.NewLabel(fmt.Sprintf("Level: %d | Score: %d | Dots: %d",
+		g.game.CurrentLevel+1, g.game.Score, g.game.CurrentMap.CountDots()))
 	g.infoLabel.TextStyle = fyne.TextStyle{Bold: true}
 
 	g.controlsLabel = widget.NewLabel("Controls: Arrow Keys to move | F2 restart | +/- zoom | ESC settings")
@@ -424,10 +425,16 @@ func (g *GUIGame) setupGameUI() {
 	statusBarBg := canvas.NewRectangle(color.RGBA{40, 40, 50, 255})
 	g.infoLabel.Importance = widget.HighImportance
 
-	// Create status bar with padding
-	infoBox := container.NewVBox(g.infoLabel, g.controlsLabel)
-	topBar := container.NewPadded(infoBox)
-	statusBar := container.NewStack(statusBarBg, topBar)
+	// Create status bar - only show level, score, dots and hearts (no controls line)
+	g.livesDisplay = g.createLivesDisplay(g.game.Lives)
+	topBarContent := container.NewHBox(
+		g.infoLabel,
+		layout.NewSpacer(), // Flexible spacer that grows to push hearts to the far right
+		g.livesDisplay, // Hearts display on the far right
+	)
+	// Create status bar with minimal padding for fixed height
+	statusBar := container.NewStack(statusBarBg, container.NewPadded(topBarContent))
+	g.statusBarHeight = statusBar.MinSize().Height
 
 	// Main container with scroll
 	scroll := container.NewScroll(g.canvas)
@@ -436,16 +443,21 @@ func (g *GUIGame) setupGameUI() {
 	g.initControls()
 	gameArea := container.NewStack(scroll, g.keyCatcher)
 
+	// Combine status bar and game area vertically, filling entire space
 	content := container.NewBorder(statusBar, nil, nil, nil, gameArea)
-	minRect := canvas.NewRectangle(color.Transparent)
-	minRect.Resize(fyne.NewSize(minWindowSize, minWindowSize))
-	contentWithMin := container.NewMax(minRect, content)
 
-	g.window.SetContent(contentWithMin)
+	// Set window background to match game background (black)
+	windowBg := canvas.NewRectangle(color.RGBA{0, 0, 0, 255})
+	contentWithBg := container.NewStack(windowBg, content)
+
+	g.window.SetContent(contentWithBg)
 	g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
 		g.handleKeyPress(ev, g.infoLabel)
 	})
+	// Size window to map based on initial block size, then recalc for exact fit
+	g.calculateBlockSize()
 	g.resizeWindowForMap()
+	g.calculateBlockSize()
 
 	// Focus key catcher so arrow keys (including Up) are not swallowed by scroll
 	g.window.Canvas().Focus(g.keyCatcher)
@@ -458,7 +470,6 @@ func (g *GUIGame) setupGameUI() {
 
 	// Render initial state
 	g.renderGame(g.infoLabel)
-	g.calculateBlockSize()
 
 	// Add window size tracking for dynamic resizing
 	go func() {
@@ -490,8 +501,8 @@ func (g *GUIGame) resizeWindowForMap() {
 		return
 	}
 
-	mapWidth := float32(g.game.CurrentMap.Width) * g.blockSize
-	mapHeight := float32(g.game.CurrentMap.Height)*g.blockSize + statusBarHeight
+	mapWidth := float32(g.game.CurrentMap.Width+borderBlocks*2) * g.blockSize
+	mapHeight := float32(g.game.CurrentMap.Height+borderBlocks*2)*g.blockSize + g.currentStatusBarHeight()
 
 	winWidth := mapWidth
 	winHeight := mapHeight
@@ -503,6 +514,15 @@ func (g *GUIGame) resizeWindowForMap() {
 	}
 
 	g.window.Resize(fyne.NewSize(winWidth, winHeight))
+}
+
+func (g *GUIGame) createLivesDisplay(lives int) *fyne.Container {
+	heartsContainer := container.NewHBox()
+	for i := 0; i < lives; i++ {
+		heart := widget.NewLabel("❤️")
+		heartsContainer.Add(heart)
+	}
+	return heartsContainer
 }
 
 func (g *GUIGame) initControls() {
@@ -526,25 +546,40 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 	m := g.game.CurrentMap
 
 	// Calculate canvas dimensions
-	canvasWidth := float32(m.Width) * g.blockSize
-	canvasHeight := float32(m.Height) * g.blockSize
+	canvasWidth := float32(m.Width+borderBlocks*2) * g.blockSize
+	canvasHeight := float32(m.Height+borderBlocks*2) * g.blockSize
 	g.canvas.Resize(fyne.NewSize(canvasWidth, canvasHeight))
+
+	mapOriginX, mapOriginY := g.mapOrigin()
 
 	// Rebuild cache if needed (map changed or block size changed)
 	if len(g.cachedMapRender) == 0 {
-		objects := make([]fyne.CanvasObject, 0, m.Width*m.Height*3)
+		objects := make([]fyne.CanvasObject, 0, (m.Width+borderBlocks*2)*(m.Height+borderBlocks*2)*3)
 
 		// Pre-render backgrounds and walls (static parts)
 		for y := 0; y < m.Height; y++ {
 			for x := 0; x < m.Width; x++ {
 				rect := canvas.NewRectangle(color.RGBA{0, 0, 0, 255})
 				rect.Resize(fyne.NewSize(g.blockSize, g.blockSize))
-				rect.Move(fyne.NewPos(g.offsetX+float32(x)*g.blockSize, g.offsetY+float32(y)*g.blockSize))
+				rect.Move(fyne.NewPos(mapOriginX+float32(x)*g.blockSize, mapOriginY+float32(y)*g.blockSize))
 				objects = append(objects, rect)
 
 				if m.Cells[y][x] == maps.Wall {
 					// Inline wall drawing to avoid extra function calls
-					g.drawWallCellInto(x, y, m, &objects)
+					g.drawWallCellIntoAt(mapOriginX+float32(x)*g.blockSize, mapOriginY+float32(y)*g.blockSize, x, y, m, &objects)
+				}
+			}
+		}
+		if borderBlocks > 0 {
+			borderMap := g.buildBorderMap(m)
+			for y := 0; y < borderMap.Height; y++ {
+				for x := 0; x < borderMap.Width; x++ {
+					if x != 0 && y != 0 && x != borderMap.Width-1 && y != borderMap.Height-1 {
+						continue
+					}
+					originX := g.offsetX + float32(x)*g.blockSize
+					originY := g.offsetY + float32(y)*g.blockSize
+					g.drawWallCellIntoAt(originX, originY, x, y, borderMap, &objects)
 				}
 			}
 		}
@@ -563,7 +598,7 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 				dot.StrokeColor = color.RGBA{180, 90, 0, 255}
 				dot.StrokeWidth = dotSize * 0.2
 				dot.Resize(fyne.NewSize(dotSize, dotSize))
-				dot.Move(fyne.NewPos(g.offsetX+float32(x)*g.blockSize+(g.blockSize-dotSize)/2, g.offsetY+float32(y)*g.blockSize+(g.blockSize-dotSize)/2))
+				dot.Move(fyne.NewPos(mapOriginX+float32(x)*g.blockSize+(g.blockSize-dotSize)/2, mapOriginY+float32(y)*g.blockSize+(g.blockSize-dotSize)/2))
 				g.canvas.Add(dot)
 			}
 		}
@@ -577,15 +612,23 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 		}
 		moving := math.Abs(float64(pos.x-float32(monster.X))) > 0.001 || math.Abs(float64(pos.y-float32(monster.Y))) > 0.001
 		blinkSwap := g.monsterTeethBlinkSwap(moving)
-		g.drawMonster(g.offsetX+pos.x*g.blockSize+g.blockSize*0.1, g.offsetY+pos.y*g.blockSize+g.blockSize*0.1, g.blockSize*0.8, blinkSwap)
+		g.drawMonster(mapOriginX+pos.x*g.blockSize+g.blockSize*0.1, mapOriginY+pos.y*g.blockSize+g.blockSize*0.1, g.blockSize*0.8, blinkSwap)
 	}
 
 	// Render player (yellow semi-circle with mouth)
-	g.drawPacman(g.offsetX+playerPos.x*g.blockSize+g.blockSize*0.05, g.offsetY+playerPos.y*g.blockSize+g.blockSize*0.05, g.blockSize*0.9, g.game.Player.Direction)
+	g.drawPacman(mapOriginX+playerPos.x*g.blockSize+g.blockSize*0.05, mapOriginY+playerPos.y*g.blockSize+g.blockSize*0.05, g.blockSize*0.9, g.game.Player.Direction)
 
 	// Update info
-	infoLabel.SetText(fmt.Sprintf("Level: %d | Score: %d | Lives: %d | Dots: %d",
-		g.game.CurrentLevel+1, g.game.Score, g.game.Lives, g.game.CurrentMap.CountDots()))
+	infoLabel.SetText(fmt.Sprintf("Level: %d | Score: %d | Dots: %d",
+		g.game.CurrentLevel+1, g.game.Score, g.game.CurrentMap.CountDots()))
+	
+	// Update lives display
+	g.livesDisplay.Objects = nil
+	for i := 0; i < g.game.Lives; i++ {
+		heart := widget.NewLabel("❤️")
+		g.livesDisplay.Add(heart)
+	}
+	g.livesDisplay.Refresh()
 
 	// Show/hide controls based on state
 	g.updateControlsVisibility()
@@ -606,17 +649,58 @@ func (g *GUIGame) updateControlsVisibility() {
 	}
 }
 
+func (g *GUIGame) mapOrigin() (float32, float32) {
+	borderOffset := float32(borderBlocks) * g.blockSize
+	return g.offsetX + borderOffset, g.offsetY + borderOffset
+}
+
+func (g *GUIGame) currentStatusBarHeight() float32 {
+	if g.statusBarHeight > 0 {
+		return g.statusBarHeight
+	}
+	return statusBarHeight
+}
+
+func (g *GUIGame) buildBorderMap(m *maps.Map) *maps.Map {
+	width := m.Width + borderBlocks*2
+	height := m.Height + borderBlocks*2
+	cells := make([][]maps.Cell, height)
+	for y := 0; y < height; y++ {
+		cells[y] = make([]maps.Cell, width)
+		for x := 0; x < width; x++ {
+			if x == 0 || y == 0 || x == width-1 || y == height-1 {
+				cells[y][x] = maps.Wall
+				continue
+			}
+			cells[y][x] = m.Cells[y-1][x-1]
+		}
+	}
+
+	return &maps.Map{
+		Width:    width,
+		Height:   height,
+		Cells:    cells,
+		Material: m.Material,
+	}
+}
+
 func (g *GUIGame) drawWallCell(x, y int, m *maps.Map) {
 	objs := make([]fyne.CanvasObject, 0)
-	g.drawWallCellInto(x, y, m, &objs)
+	mapOriginX, mapOriginY := g.mapOrigin()
+	g.drawWallCellIntoAt(mapOriginX+float32(x)*g.blockSize, mapOriginY+float32(y)*g.blockSize, x, y, m, &objs)
 	for _, obj := range objs {
 		g.canvas.Add(obj)
 	}
 }
 
 func (g *GUIGame) drawWallCellInto(x, y int, m *maps.Map, objs *[]fyne.CanvasObject) {
-	originX := g.offsetX + float32(x)*g.blockSize
-	originY := g.offsetY + float32(y)*g.blockSize
+	mapOriginX, mapOriginY := g.mapOrigin()
+	originX := mapOriginX + float32(x)*g.blockSize
+	originY := mapOriginY + float32(y)*g.blockSize
+	g.drawWallCellIntoAt(originX, originY, x, y, m, objs)
+}
+
+func (g *GUIGame) drawWallCellIntoAt(originX, originY float32, x, y int, m *maps.Map, objs *[]fyne.CanvasObject) {
 	line := g.blockSize * 0.08
 	if line < 1 {
 		line = 1
@@ -1057,8 +1141,9 @@ func (g *GUIGame) renderGameWithCountdown(infoLabel *widget.Label) {
 		countdownText.Alignment = fyne.TextAlignCenter
 
 		m := g.game.CurrentMap
-		centerX := float32(m.Width) * g.blockSize / 2
-		centerY := float32(m.Height) * g.blockSize / 2
+		mapOriginX, mapOriginY := g.mapOrigin()
+		centerX := mapOriginX + float32(m.Width)*g.blockSize/2
+		centerY := mapOriginY + float32(m.Height)*g.blockSize/2
 
 		countdownText.Move(fyne.NewPos(centerX-40, centerY-40))
 		g.canvas.Add(countdownText)
@@ -1075,14 +1160,14 @@ func (g *GUIGame) calculateBlockSize() {
 	canvasSize := g.window.Canvas().Size()
 
 	// Account for status bar (~80 pixels)
-	availHeight := canvasSize.Height - statusBarHeight
+	availHeight := canvasSize.Height - g.currentStatusBarHeight()
 	availWidth := canvasSize.Width
 
-	// Calculate block size based on map dimensions to fill window
-	blockSizeByHeight := availHeight / float32(m.Height)
-	blockSizeByWidth := availWidth / float32(m.Width)
+	// Calculate block size based on map dimensions to fill available space
+	blockSizeByHeight := availHeight / float32(m.Height+borderBlocks*2)
+	blockSizeByWidth := availWidth / float32(m.Width+borderBlocks*2)
 
-	// Use the smaller to fit entire map in window
+	// Use the smaller to fit the entire map in window
 	g.blockSize = blockSizeByHeight
 	if blockSizeByWidth < blockSizeByHeight {
 		g.blockSize = blockSizeByWidth
@@ -1102,8 +1187,8 @@ func (g *GUIGame) calculateBlockSize() {
 	g.cachedMapRender = nil
 
 	// Calculate actual map dimensions in pixels
-	mapPixelWidth := float32(m.Width) * g.blockSize
-	mapPixelHeight := float32(m.Height) * g.blockSize
+	mapPixelWidth := float32(m.Width+borderBlocks*2) * g.blockSize
+	mapPixelHeight := float32(m.Height+borderBlocks*2) * g.blockSize
 
 	// Calculate offsets to center the game if there's extra space
 	g.offsetX = 0
