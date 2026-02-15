@@ -17,9 +17,9 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/sjiamnocna/gopucha/internal/actors"
@@ -430,7 +430,7 @@ func (g *GUIGame) setupGameUI() {
 	topBarContent := container.NewHBox(
 		g.infoLabel,
 		layout.NewSpacer(), // Flexible spacer that grows to push hearts to the far right
-		g.livesDisplay, // Hearts display on the far right
+		g.livesDisplay,     // Hearts display on the far right
 	)
 	// Create status bar with minimal padding for fixed height
 	statusBar := container.NewStack(statusBarBg, container.NewPadded(topBarContent))
@@ -621,7 +621,7 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 	// Update info
 	infoLabel.SetText(fmt.Sprintf("Level: %d | Score: %d | Dots: %d",
 		g.game.CurrentLevel+1, g.game.Score, g.game.CurrentMap.CountDots()))
-	
+
 	// Update lives display
 	g.livesDisplay.Objects = nil
 	for i := 0; i < g.game.Lives; i++ {
