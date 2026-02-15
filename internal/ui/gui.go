@@ -179,7 +179,7 @@ func (g *GUIGame) showSettings() {
 	d = dialog.NewCustomConfirm("Settings", "Apply", "Cancel", stack, func(apply bool) {
 		handleClose(apply)
 	}, g.window)
-	
+
 	// Set up canvas-level key handler for the dialog
 	originalHandler := g.window.Canvas().OnTypedKey()
 	g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
@@ -197,13 +197,13 @@ func (g *GUIGame) showSettings() {
 			}
 		}
 	})
-	
+
 	d.SetOnClosed(func() {
 		if originalHandler != nil {
 			g.window.Canvas().SetOnTypedKey(originalHandler)
 		}
 	})
-	
+
 	d.Show()
 	g.window.Canvas().Focus(key)
 }
@@ -314,7 +314,7 @@ func (g *GUIGame) showMapErrorAndClose(err error) {
 		content.Add(selectLabel)
 		content.Add(mapSelect)
 	}
-	
+
 	if len(mapFiles) <= 1 {
 		var d dialog.Dialog
 		key := newKeyCatcher(func(ev *fyne.KeyEvent) {
@@ -326,9 +326,9 @@ func (g *GUIGame) showMapErrorAndClose(err error) {
 			}
 		})
 		stack := container.NewStack(content, key)
-		
+
 		d = dialog.NewCustom("Map Error", "Exit", stack, g.window)
-		
+
 		originalHandler := g.window.Canvas().OnTypedKey()
 		g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
 			if ev.Name == fyne.KeyEscape || ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
@@ -339,7 +339,7 @@ func (g *GUIGame) showMapErrorAndClose(err error) {
 				}
 			}
 		})
-		
+
 		d.SetOnClosed(func() {
 			g.window.Close()
 			if originalHandler != nil {
@@ -362,7 +362,7 @@ func (g *GUIGame) showMapErrorAndClose(err error) {
 		}
 		g.window.Close()
 	}
-	
+
 	key := newKeyCatcher(func(ev *fyne.KeyEvent) {
 		if ev.Name == fyne.KeyEscape {
 			handleSelect(false)
@@ -379,7 +379,7 @@ func (g *GUIGame) showMapErrorAndClose(err error) {
 	stack := container.NewStack(content, key)
 
 	d = dialog.NewCustomConfirm("Map Error", "Load selected", "Exit", stack, handleSelect, g.window)
-	
+
 	originalHandler := g.window.Canvas().OnTypedKey()
 	g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
 		if ev.Name == fyne.KeyEscape {
@@ -396,13 +396,13 @@ func (g *GUIGame) showMapErrorAndClose(err error) {
 			}
 		}
 	})
-	
+
 	d.SetOnClosed(func() {
 		if originalHandler != nil {
 			g.window.Canvas().SetOnTypedKey(originalHandler)
 		}
 	})
-	
+
 	d.Show()
 	g.window.Canvas().Focus(key)
 }
@@ -1181,7 +1181,7 @@ func (g *GUIGame) handleF2NewGame() {
 		msg := widget.NewLabel("Start a new game? Current progress will be lost.")
 		msg.Wrapping = fyne.TextWrapWord
 		content := container.NewVBox(msg)
-		
+
 		var d *dialog.ConfirmDialog
 		handleChoice := func(ok bool) {
 			if ok {
@@ -1192,7 +1192,7 @@ func (g *GUIGame) handleF2NewGame() {
 				g.window.Canvas().Focus(g.keyCatcher)
 			}
 		}
-		
+
 		key := newKeyCatcher(func(ev *fyne.KeyEvent) {
 			if ev.Name == fyne.KeyEscape {
 				handleChoice(false)
@@ -1207,9 +1207,9 @@ func (g *GUIGame) handleF2NewGame() {
 			}
 		})
 		stack := container.NewStack(content, key)
-		
+
 		d = dialog.NewCustomConfirm("New Game", "Yes", "No", stack, handleChoice, g.window)
-		
+
 		originalHandler := g.window.Canvas().OnTypedKey()
 		g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
 			if ev.Name == fyne.KeyEscape {
@@ -1226,13 +1226,13 @@ func (g *GUIGame) handleF2NewGame() {
 				}
 			}
 		})
-		
+
 		d.SetOnClosed(func() {
 			if originalHandler != nil {
 				g.window.Canvas().SetOnTypedKey(originalHandler)
 			}
 		})
-		
+
 		d.Show()
 		g.window.Canvas().Focus(key)
 	} else {
@@ -1288,7 +1288,7 @@ func (g *GUIGame) startGameLoop() {
 					msg := widget.NewLabel(fmt.Sprintf("Final Score: %d", g.game.Score))
 					msg.Alignment = fyne.TextAlignCenter
 					content := container.NewVBox(msg)
-					
+
 					var d dialog.Dialog
 					key := newKeyCatcher(func(ev *fyne.KeyEvent) {
 						if ev.Name == fyne.KeyEscape || ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
@@ -1298,9 +1298,9 @@ func (g *GUIGame) startGameLoop() {
 						}
 					})
 					stack := container.NewStack(content, key)
-					
+
 					d = dialog.NewCustom("You Won!", "OK", stack, g.window)
-					
+
 					originalHandler := g.window.Canvas().OnTypedKey()
 					g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
 						if ev.Name == fyne.KeyEscape || ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
@@ -1310,13 +1310,13 @@ func (g *GUIGame) startGameLoop() {
 							}
 						}
 					})
-					
+
 					d.SetOnClosed(func() {
 						if originalHandler != nil {
 							g.window.Canvas().SetOnTypedKey(originalHandler)
 						}
 					})
-					
+
 					d.Show()
 					g.window.Canvas().Focus(key)
 				})

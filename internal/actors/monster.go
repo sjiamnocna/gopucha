@@ -37,86 +37,46 @@ func (mo *Monster) Move(m *maps.Map, playerX, playerY int, monsters []Monster) {
 }
 
 func (mo *Monster) chooseDirection(m *maps.Map, playerX, playerY int, monsters []Monster) Direction {
-	bestDir := mo.Direction
-	bestDist := -1
-	distMap := bfsDistanceMap(m, playerX, playerY, monsters, mo)
+	dx := playerX - mo.X
+	dy := playerY - mo.Y
 
-	for _, d := range []Direction{Up, Down, Left, Right} {
-		dx, dy := directionDelta(d)
-		nx, ny := mo.X+dx, mo.Y+dy
-		if m.IsWall(nx, ny) || isOccupiedByMonster(nx, ny, monsters, mo) {
-			continue
-		}
-		if ny >= 0 && ny < m.Height && nx >= 0 && nx < m.Width {
-			dist := distMap[ny][nx]
-			if dist >= 0 && (bestDist == -1 || dist < bestDist) {
-				bestDist = dist
-				bestDir = d
-			}
-		}
+	// Prioritize the axis with the larger distance
+	// This gives simple chase behavior without pathfinding
+	candidates := []Direction{}
+
+	if dx > 0 {
+		candidates = append(candidates, Right)
+	} else if dx < 0 {
+		candidates = append(candidates, Left)
 	}
 
-	if bestDist == -1 {
-		for _, d := range []Direction{Up, Down, Left, Right} {
-			dx, dy := directionDelta(d)
-			nx, ny := mo.X+dx, mo.Y+dy
-			if !m.IsWall(nx, ny) && !isOccupiedByMonster(nx, ny, monsters, mo) {
-				return d
-			}
-		}
+	if dy > 0 {
+		candidates = append(candidates, Down)
+	} else if dy < 0 {
+		candidates = append(candidates, Up)
 	}
 
-	return bestDir
-}
-
-func bfsDistanceMap(m *maps.Map, targetX, targetY int, monsters []Monster, self *Monster) [][]int {
-	dist := make([][]int, m.Height)
-	for y := range dist {
-		dist[y] = make([]int, m.Width)
-		for x := range dist[y] {
-			dist[y][x] = -1
+	// Try each candidate direction, return the first valid one
+	for _, d := range candidates {
+		ndx, ndy := directionDelta(d)
+		nx, ny := mo.X+ndx, mo.Y+ndy
+		if !m.IsWall(nx, ny) && !isOccupiedByMonster(nx, ny, monsters, mo) {
+			return d
 		}
 	}
 
-	if targetX < 0 || targetY < 0 || targetX >= m.Width || targetY >= m.Height {
-		return dist
-	}
-	if m.IsWall(targetX, targetY) {
-		return dist
-	}
-
-	queueX := []int{targetX}
-	queueY := []int{targetY}
-	dist[targetY][targetX] = 0
-
-	for len(queueX) > 0 {
-		x := queueX[0]
-		y := queueY[0]
-		queueX = queueX[1:]
-		queueY = queueY[1:]
-
-		neighbors := [][2]int{{x + 1, y}, {x - 1, y}, {x, y + 1}, {x, y - 1}}
-		for _, n := range neighbors {
-			nx, ny := n[0], n[1]
-			if nx < 0 || ny < 0 || nx >= m.Width || ny >= m.Height {
-				continue
-			}
-			if dist[ny][nx] != -1 {
-				continue
-			}
-			if m.IsWall(nx, ny) {
-				continue
-			}
-			if isOccupiedByMonster(nx, ny, monsters, self) {
-				continue
-			}
-			dist[ny][nx] = dist[y][x] + 1
-			queueX = append(queueX, nx)
-			queueY = append(queueY, ny)
+	// If both preferred directions blocked, try the others
+	allDirs := []Direction{Up, Down, Left, Right}
+	for _, d := range allDirs {
+		ndx, ndy := directionDelta(d)
+		nx, ny := mo.X+ndx, mo.Y+ndy
+		if !m.IsWall(nx, ny) && !isOccupiedByMonster(nx, ny, monsters, mo) {
+			return d
 		}
 	}
 
-	return dist
+	// Dead end, stay in place
+	return mo.Direction
 }
 
 func isOccupiedByMonster(x, y int, monsters []Monster, self *Monster) bool {
