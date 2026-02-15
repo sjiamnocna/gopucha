@@ -89,8 +89,13 @@ jobs:
       - name: Package (tar.gz)
         if: matrix.os != 'windows-latest'
         run: |
-          mkdir -p dist
-          tar -czf "dist/${{ matrix.archive }}" --transform='s,^bin/,,' --transform='s,^maps/,,' bin/${{ matrix.bin }} maps
+          mkdir -p dist/package
+          cp "bin/${{ matrix.bin }}" "dist/package/${{ matrix.bin }}"
+          cp -r maps "dist/package/"
+          cd dist
+          tar -czf "${{ matrix.archive }}" -C package .
+          cd ..
+          rm -rf dist/package
         shell: bash
 
       - name: Package (zip)

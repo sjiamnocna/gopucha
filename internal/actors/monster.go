@@ -40,23 +40,46 @@ func (mo *Monster) chooseDirection(m *maps.Map, playerX, playerY int, monsters [
 	dx := playerX - mo.X
 	dy := playerY - mo.Y
 
-	// Prioritize the axis with the larger distance
-	// This gives simple chase behavior without pathfinding
+	// Get absolute distances
+	absDx := dx
+	if absDx < 0 {
+		absDx = -absDx
+	}
+	absDy := dy
+	if absDy < 0 {
+		absDy = -absDy
+	}
+
+	// Prioritize the axis with the LARGER distance
 	candidates := []Direction{}
 
-	if dx > 0 {
-		candidates = append(candidates, Right)
-	} else if dx < 0 {
-		candidates = append(candidates, Left)
+	if absDx >= absDy {
+		// X-axis is dominant or equal, try X first, then Y
+		if dx > 0 {
+			candidates = append(candidates, Right)
+		} else if dx < 0 {
+			candidates = append(candidates, Left)
+		}
+		if dy > 0 {
+			candidates = append(candidates, Down)
+		} else if dy < 0 {
+			candidates = append(candidates, Up)
+		}
+	} else {
+		// Y-axis is dominant, try Y first, then X
+		if dy > 0 {
+			candidates = append(candidates, Down)
+		} else if dy < 0 {
+			candidates = append(candidates, Up)
+		}
+		if dx > 0 {
+			candidates = append(candidates, Right)
+		} else if dx < 0 {
+			candidates = append(candidates, Left)
+		}
 	}
 
-	if dy > 0 {
-		candidates = append(candidates, Down)
-	} else if dy < 0 {
-		candidates = append(candidates, Up)
-	}
-
-	// Try each candidate direction, return the first valid one
+	// Try each candidate direction in priority order
 	for _, d := range candidates {
 		ndx, ndy := directionDelta(d)
 		nx, ny := mo.X+ndx, mo.Y+ndy
@@ -65,7 +88,7 @@ func (mo *Monster) chooseDirection(m *maps.Map, playerX, playerY int, monsters [
 		}
 	}
 
-	// If both preferred directions blocked, try the others
+	// If preferred directions blocked, try all directions
 	allDirs := []Direction{Up, Down, Left, Right}
 	for _, d := range allDirs {
 		ndx, ndy := directionDelta(d)
