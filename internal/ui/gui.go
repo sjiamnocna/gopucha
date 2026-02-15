@@ -303,95 +303,26 @@ func (g *GUIGame) showMapErrorAndClose(err error) {
 	msg := widget.NewLabel(err.Error())
 	msg.Wrapping = fyne.TextWrapWord
 
-	mapFiles := g.findMapFiles()
-	selectLabel := widget.NewLabel("Select another map:")
-	mapSelect := widget.NewSelect(mapFiles, func(selected string) {})
-	if len(mapFiles) > 0 {
-		mapSelect.SetSelected(mapFiles[0])
-	}
-
 	content := container.NewVBox(msg)
-	if len(mapFiles) > 0 {
-		content.Add(selectLabel)
-		content.Add(mapSelect)
-	}
 
-	if len(mapFiles) <= 1 {
-		var d dialog.Dialog
-		key := newKeyCatcher(func(ev *fyne.KeyEvent) {
-			if ev.Name == fyne.KeyEscape || ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
-				if d != nil {
-					d.Hide()
-				}
-				g.window.Close()
-			}
-		})
-		stack := container.NewStack(content, key)
-
-		d = dialog.NewCustom("Map Error", "Exit", stack, g.window)
-
-		originalHandler := g.window.Canvas().OnTypedKey()
-		g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
-			if ev.Name == fyne.KeyEscape || ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
-				d.Hide()
-				g.window.Close()
-				if originalHandler != nil {
-					g.window.Canvas().SetOnTypedKey(originalHandler)
-				}
-			}
-		})
-
-		d.SetOnClosed(func() {
-			g.window.Close()
-			if originalHandler != nil {
-				g.window.Canvas().SetOnTypedKey(originalHandler)
-			}
-		})
-		d.Show()
-		g.window.Canvas().Focus(key)
-		return
-	}
-
-	var d *dialog.ConfirmDialog
-	handleSelect := func(apply bool) {
-		if apply {
-			if mapSelect.Selected != "" {
-				g.mapFile = mapSelect.Selected
-				g.startGame()
-				return
-			}
-		}
-		g.window.Close()
-	}
-
+	var d dialog.Dialog
 	key := newKeyCatcher(func(ev *fyne.KeyEvent) {
-		if ev.Name == fyne.KeyEscape {
-			handleSelect(false)
+		if ev.Name == fyne.KeyEscape || ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
 			if d != nil {
 				d.Hide()
 			}
-		} else if ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
-			handleSelect(true)
-			if d != nil {
-				d.Hide()
-			}
+			g.window.Close()
 		}
 	})
 	stack := container.NewStack(content, key)
 
-	d = dialog.NewCustomConfirm("Map Error", "Load selected", "Exit", stack, handleSelect, g.window)
+	d = dialog.NewCustom("Map Error", "Exit", stack, g.window)
 
 	originalHandler := g.window.Canvas().OnTypedKey()
 	g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
-		if ev.Name == fyne.KeyEscape {
-			handleSelect(false)
+		if ev.Name == fyne.KeyEscape || ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
 			d.Hide()
-			if originalHandler != nil {
-				g.window.Canvas().SetOnTypedKey(originalHandler)
-			}
-		} else if ev.Name == fyne.KeyReturn || ev.Name == fyne.KeyEnter {
-			handleSelect(true)
-			d.Hide()
+			g.window.Close()
 			if originalHandler != nil {
 				g.window.Canvas().SetOnTypedKey(originalHandler)
 			}
@@ -399,12 +330,14 @@ func (g *GUIGame) showMapErrorAndClose(err error) {
 	})
 
 	d.SetOnClosed(func() {
+		g.window.Close()
 		if originalHandler != nil {
 			g.window.Canvas().SetOnTypedKey(originalHandler)
 		}
 	})
-
-	d.Show()
+	if d != nil {
+		d.Show()
+	}
 	g.window.Canvas().Focus(key)
 }
 
@@ -427,6 +360,7 @@ func (g *GUIGame) setupGameUI() {
 
 	// Create status bar - only show level, score, dots and hearts (no controls line)
 	g.livesDisplay = g.createLivesDisplay(g.game.Lives)
+	g.lastLives = g.game.Lives
 	topBarContent := container.NewHBox(
 		g.infoLabel,
 		layout.NewSpacer(), // Flexible spacer that grows to push hearts to the far right
@@ -622,13 +556,16 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 	infoLabel.SetText(fmt.Sprintf("%s | Score: %d | Dots: %d",
 		g.levelDisplayName(), g.game.Score, g.game.CurrentMap.CountDots()))
 
-	// Update lives display
-	g.livesDisplay.Objects = nil
-	for i := 0; i < g.game.Lives; i++ {
-		heart := widget.NewLabel("❤️")
-		g.livesDisplay.Add(heart)
+	// Update lives display only when needed
+	if g.lastLives != g.game.Lives {
+		g.livesDisplay.Objects = nil
+		for i := 0; i < g.game.Lives; i++ {
+			heart := widget.NewLabel("❤️")
+			g.livesDisplay.Add(heart)
+		}
+		g.livesDisplay.Refresh()
+		g.lastLives = g.game.Lives
 	}
-	g.livesDisplay.Refresh()
 
 	// Show/hide controls based on state
 	g.updateControlsVisibility()
@@ -1123,20 +1060,6 @@ func (g *GUIGame) startMouthAnimation() {
 			}
 		}
 	}()
-}
-
-func (g *GUIGame) minF(a, b float32) float32 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func (g *GUIGame) maxF(a, b float32) float32 {
-	if a > b {
-		return a
-	}
-	return b
 }
 
 func (g *GUIGame) renderGameWithCountdown(infoLabel *widget.Label) {

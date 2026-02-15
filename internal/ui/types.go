@@ -37,6 +37,7 @@ type GUIGame struct {
 	infoLabel             *widget.Label
 	controlsLabel         *widget.Label
 	livesDisplay          *fyne.Container // Hearts display for lives
+	lastLives             int
 	state                 GameState
 	countdownStart        time.Time
 	pauseTicks            int

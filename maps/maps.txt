@@ -1,6 +1,5 @@
 name: Jancsi.cz
 material: classic
-
 M----------------------M
 ------------------------
 --OO----------------OO--
@@ -17,11 +16,28 @@ M----------------------M
 -------O---OOO-OOO------
 ----OO--------------OO--
 M-----------P----------M
-
+---
+name: Grave robber
+material: bricks
+----OOOOOOOO---OOOOOO---
+O----------OO----------O
+O-OOOO-OOO-OO-OOOO-OOO-O
+O-O----O------O----O---O
+O-O-OO-OOOOOO-O-OO-O-O-O
+O-O-OO------O-O-OO-O-O-O
+O-OOOO-OOOO-O-OOOO-O-O-O
+O------O----O------O-O-O
+OOOOO-O-O-OOOOOO-O-O-O-O
+O---O-O-O------O-O-O---O
+O-O-O-O-OOOOOO-O-O-OOOOO
+O-O---O----O----O-O----O
+O-OOOOOOOO-O-OOOO-OOOO-O
+O-M--------P----O----M-O
+O-------O----O--O------O
+OO---O--O----O----------
 ---
 name: Intro
 material: bricks
-
 M--O---O---OO----OOOO--M
 ---O--OOO--O-O-O-O----OO
 -O-O-O---O-O--OO-O------
@@ -38,11 +54,9 @@ M--O---O---OO----OOOO--M
 ---OO------------OOO----
 ----OO---------OOO------
 M--OOOOOOOOP-OOOOOOOO---
-
 ---
 name: Mobby Dick
 material: purpledots
-
 P------O-O-O-O-O-O-O-O-O
 -O-OO-------------------
 ------O-O-O-O-O-O-O-O-OO
@@ -59,11 +73,9 @@ OOO-OOOOOOOOOOOOOOOOOOOO
 -O----------------------
 -O-O-O-O-O-O-O-O-O-O-O-O
 -----------------------M
-
 ---
 name: Archeolog
 material: graybrick
-
 OM--------O---O-------MO
 O-OOOOOOOOO---OOOOOOOO-O
 O--OO-------O-----OO---O
@@ -80,11 +92,9 @@ O--OO------O------OO---O
 OOOO-------O-------OOOOO
 O---------OOO----------O
 OP---O-----------O----MO
-
 ---
 name: Sandokan
 material: classic
-
 M-------O----------O---M
 --------O----------O----
 --------O----------O----
