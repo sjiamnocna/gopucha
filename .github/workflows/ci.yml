@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   fmt:
@@ -110,6 +110,19 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: dist/${{ matrix.archive }}
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    needs: [fmt, build]
+    if: ${{ always() }}
+    steps:
+      - name: Fail if upstream jobs failed
+        run: |
+          echo "fmt:   ${{ needs.fmt.result }}"
+          echo "build: ${{ needs.build.result }}"
+          test "${{ needs.fmt.result }}" = "success"
+          test "${{ needs.build.result }}" = "success"
+
 
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
