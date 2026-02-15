@@ -900,7 +900,7 @@ func (g *GUIGame) capturePositions() (renderPos, []renderPos) {
 }
 
 func (g *GUIGame) animateMovement(infoLabel *widget.Label, startPlayer, endPlayer renderPos, startMonsters, endMonsters []renderPos) {
-	steps := 2 // Reduced from 4 to cut rendering work in half
+	steps := 4 // Smoother animation without changing game speed
 	stepDuration := g.tickInterval / time.Duration(steps)
 	if stepDuration < 10*time.Millisecond {
 		stepDuration = 10 * time.Millisecond
