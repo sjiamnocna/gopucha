@@ -151,7 +151,7 @@ func (g *GUIGame) showSettings() {
 		}
 
 		// If cancelled and game was running, resume it
-		if g.state == StatePlaying && g.game != nil {
+		if (g.state == StatePlaying || g.state == StateLevelStart || g.state == StateLevelComplete) && g.game != nil {
 			g.startGameLoop()
 			g.initControls()
 			// Ensure focus after dialog closes
@@ -386,6 +386,10 @@ func (g *GUIGame) setupGameUI() {
 
 	g.window.SetContent(contentWithBg)
 	g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+		if ev.Name == fyne.KeyEscape {
+			g.showSettings()
+			return
+		}
 		g.handleKeyPress(ev, g.infoLabel)
 	})
 	// Size window to map based on initial block size, then recalc for exact fit
@@ -1140,6 +1144,10 @@ func (g *GUIGame) calculateBlockSize() {
 }
 
 func (g *GUIGame) handleKeyPress(ev *fyne.KeyEvent, infoLabel *widget.Label) {
+	if ev.Name == fyne.KeyEscape {
+		g.showSettings()
+		return
+	}
 	// Handle arrow keys and space after game over to restart
 	if g.state == StateGameOver || g.state == StateWon {
 		switch ev.Name {
@@ -1174,10 +1182,6 @@ func (g *GUIGame) handleKeyPress(ev *fyne.KeyEvent, infoLabel *widget.Label) {
 	case fyne.KeyRight:
 		if g.state == StatePlaying || g.state == StateLevelStart || g.state == StateLevelComplete {
 			g.game.Player.SetDirection(actors.Right)
-		}
-	case fyne.KeyEscape:
-		if g.state == StatePlaying {
-			g.showSettings()
 		}
 	case fyne.KeyF2:
 		g.handleF2NewGame()
