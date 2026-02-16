@@ -1,19 +1,16 @@
 package ui
 
 import (
-	"fmt"
 	"fyne.io/fyne/v2"
 )
 
 // CenterInBand centers a box within a horizontal band inside the canvas.
 // bandTop is the Y offset of the band, and bandHeight is its height.
 func CenterInBand(canvasSize fyne.Size, bandTop, bandHeight float32, boxSize fyne.Size) fyne.Position {
-	x := ((canvasSize.Width - boxSize.Width) / 3) + boxSize.Width
-	fmt.Println(boxSize, "Canvas.Width:", canvasSize.Width, " - Box.Width:", boxSize.Width)
-	fmt.Println("Calculated X:", x)
+	x := (canvasSize.Width - boxSize.Width) * (2.0 / 7.0) // Center at 1/7 of the canvas width
 
 	y := bandTop + (bandHeight-boxSize.Height)/2
-	return fyne.NewPos(40.0, y)
+	return fyne.NewPos(x, y)
 }
 
 // PositionInBand lays out a wrapped object inside a container, centered in a vertical band.
