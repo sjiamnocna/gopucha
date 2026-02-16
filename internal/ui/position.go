@@ -7,9 +7,8 @@ import (
 // CenterInBand centers a box within a horizontal band inside the canvas.
 // bandTop is the Y offset of the band, and bandHeight is its height.
 func CenterInBand(canvasSize fyne.Size, bandTop, bandHeight float32, boxSize fyne.Size) fyne.Position {
-	x := (canvasSize.Width - boxSize.Width) * (2.0 / 7.0) // Center at 1/7 of the canvas width
-
-	y := bandTop + (bandHeight-boxSize.Height)/2
+	x := (canvasSize.Width - boxSize.Width) * (2.2 / 7.0) // Center at 1/7 of the canvas width
+	y := bandTop + (bandHeight-boxSize.Height)*(1.0/3.0)  // Center at 1/3 of the band height
 	return fyne.NewPos(x, y)
 }
 

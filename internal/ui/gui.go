@@ -531,20 +531,29 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 		box := g.newWarningBox("BUSTED!", false, canvasWidth*0.45)
 		size := box.MinSize()
 		box.Resize(size)
-		box.Move(fyne.NewPos((canvasWidth-size.Width)/2, (canvasHeight-size.Height)/2))
+		gameTop := g.currentStatusBarHeight()
+		gameHeight := canvasHeight - gameTop
+		pos := CenterInBand(fyne.NewSize(canvasWidth, canvasHeight), gameTop, gameHeight, size)
+		box.Move(pos)
 		g.canvas.Add(box)
 	} else if g.state == StateGameOver {
 		box := g.newWarningBox("Game over\nPress arrow to start again", false, canvasWidth*0.7)
 		size := box.MinSize()
 		box.Resize(size)
-		box.Move(fyne.NewPos((canvasWidth-size.Width)/2, (canvasHeight-size.Height)/2))
+		gameTop := g.currentStatusBarHeight()
+		gameHeight := canvasHeight - gameTop
+		pos := CenterInBand(fyne.NewSize(canvasWidth, canvasHeight), gameTop, gameHeight, size)
+		box.Move(pos)
 		g.canvas.Add(box)
 	} else if g.state == StateWon {
 		message := fmt.Sprintf("You won!\nFinal score: %d\nPress arrow to start again", g.game.Score)
 		box := g.newWarningBox(message, false, canvasWidth*0.7)
 		size := box.MinSize()
 		box.Resize(size)
-		box.Move(fyne.NewPos((canvasWidth-size.Width)/2, (canvasHeight-size.Height)/2))
+		gameTop := g.currentStatusBarHeight()
+		gameHeight := canvasHeight - gameTop
+		pos := CenterInBand(fyne.NewSize(canvasWidth, canvasHeight), gameTop, gameHeight, size)
+		box.Move(pos)
 		g.canvas.Add(box)
 	}
 
