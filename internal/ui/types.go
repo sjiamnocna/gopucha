@@ -54,6 +54,7 @@ type GUIGame struct {
 	cachedMapRender       []fyne.CanvasObject // Cached static map layer
 	warningBoxCache       map[string]*fyne.Container
 	activeWarningPopup    *widget.PopUp
+	activeOverlay         *fyne.Container // For transparent overlays (like settings)
 }
 
 type renderPos struct {

@@ -65,6 +65,7 @@ type GUIGame struct {
 	disableMonsters    bool
 	warningBoxCache    map[string]*fyne.Container
 	activeWarningPopup *widget.PopUp
+	activeOverlay      *fyne.Container // For transparent overlays (like settings)
 }
 
 type renderPos struct {
@@ -205,7 +206,7 @@ func (g *GUIGame) showSettings() {
 		return
 	}
 
-	g.showWarningDialog("Settings", content, "Apply", "Cancel", func(apply bool) {
+	g.showOverlayDialog("Settings", content, "Apply", "Cancel", func(apply bool) {
 		handleClose(apply)
 	}, nil)
 }
@@ -726,6 +727,105 @@ func (g *GUIGame) showWarningDialog(title string, content fyne.CanvasObject, okL
 	popup.Move(fyne.NewPos(0, 0))
 	positionWrapped()
 	g.window.Canvas().Focus(key)
+}
+
+// showOverlayDialog shows a dialog overlay on top of the game without darkening the background
+func (g *GUIGame) showOverlayDialog(title string, content fyne.CanvasObject, okLabel, cancelLabel string, onChoice func(bool), keyHandler func(*fyne.KeyEvent) (bool, bool)) {
+	// Remove any existing overlay
+	if g.activeOverlay != nil {
+		g.canvas.Remove(g.activeOverlay)
+		g.activeOverlay = nil
+	}
+
+	if okLabel == "" {
+		okLabel = "OK"
+	}
+
+	originalHandler := g.window.Canvas().OnTypedKey()
+	restoreHandler := func() {
+		if originalHandler != nil {
+			g.window.Canvas().SetOnTypedKey(originalHandler)
+		}
+	}
+
+	applyChoice := func(ok bool) {
+		if onChoice != nil {
+			onChoice(ok)
+		}
+		if g.activeOverlay != nil {
+			g.canvas.Remove(g.activeOverlay)
+			g.activeOverlay = nil
+		}
+		restoreHandler()
+	}
+
+	defaultKeyHandler := func(ev *fyne.KeyEvent) (bool, bool) {
+		if keyHandler != nil {
+			if handled, ok := keyHandler(ev); handled {
+				return true, ok
+			}
+		}
+		switch ev.Name {
+		case fyne.KeyEscape:
+			return true, false
+		case fyne.KeyReturn, fyne.KeyEnter:
+			return true, true
+		}
+		return false, false
+	}
+
+	buttons := make([]fyne.CanvasObject, 0, 2)
+	if cancelLabel != "" {
+		cancelButton := widget.NewButton(cancelLabel, func() {
+			applyChoice(false)
+		})
+		buttons = append(buttons, cancelButton)
+	}
+	okButton := widget.NewButton(okLabel, func() {
+		applyChoice(true)
+	})
+	buttons = append(buttons, okButton)
+
+	buttonRow := container.NewGridWithColumns(len(buttons), buttons...)
+	inner := content
+	if len(buttons) > 0 {
+		inner = container.NewVBox(content, widget.NewSeparator(), buttonRow)
+	}
+
+	wrapped := g.newWarningBoxFromContent(inner, 420)
+
+	key := newKeyCatcher(func(ev *fyne.KeyEvent) {
+		if closeDialog, ok := defaultKeyHandler(ev); closeDialog {
+			applyChoice(ok)
+		}
+	})
+
+	canvasSize := g.window.Canvas().Size()
+	boxSize := wrapped.MinSize()
+	wrapped.Resize(boxSize)
+
+	gameTop := float32(statusBarHeight)
+	gameHeight := canvasSize.Height - gameTop
+	pos := ui.CenterInBand(canvasSize, gameTop, gameHeight, boxSize)
+	wrapped.Move(pos)
+
+	// Create overlay container with transparent background and keycatcher
+	overlay := container.NewWithoutLayout(wrapped, key)
+	overlay.Resize(canvasSize)
+	key.Resize(canvasSize)
+	key.Move(fyne.NewPos(0, 0))
+
+	g.activeOverlay = overlay
+	g.canvas.Add(overlay)
+
+	g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+		if closeDialog, ok := defaultKeyHandler(ev); closeDialog {
+			applyChoice(ok)
+		}
+	})
+
+	g.window.Canvas().Focus(key)
+	g.canvas.Refresh()
 }
 
 func (g *GUIGame) updateControlsVisibility() {
