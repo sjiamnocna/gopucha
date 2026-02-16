@@ -4,10 +4,11 @@
 package ui
 
 import (
+	"time"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/widget"
 	"github.com/sjiamnocna/gopucha/internal/gameplay"
-	"time"
 )
 
 type GameState int
@@ -29,6 +30,7 @@ type GUIGame struct {
 	offsetX               float32 // X offset for centering the game
 	offsetY               float32 // Y offset for centering the game
 	canvas                *fyne.Container
+	gameArea              fyne.CanvasObject
 	statusBarHeight       float32
 	keyCatcher            *keyCatcher
 	ticker                *time.Ticker
@@ -50,6 +52,9 @@ type GUIGame struct {
 	monsterTeethBlink     bool
 	monsterTeethBlinkLast time.Time
 	cachedMapRender       []fyne.CanvasObject // Cached static map layer
+	warningBoxCache       map[string]*fyne.Container
+	activeWarningPopup    *widget.PopUp
+	activeOverlay         *fyne.Container // For transparent overlays (like settings)
 }
 
 type renderPos struct {

@@ -19,6 +19,7 @@ import (
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
+	"github.com/sjiamnocna/gopucha/internal/ui"
 )
 
 const (
@@ -41,26 +42,30 @@ const (
 )
 
 type GUIGame struct {
-	app             fyne.App
-	window          fyne.Window
-	game            *Game
-	blockSize       float32
-	canvas          *fyne.Container
-	keyCatcher      *keyCatcher
-	ticker          *time.Ticker
-	tickInterval    time.Duration
-	mapFile         string
-	infoLabel       *widget.Label
-	controlsLabel   *widget.Label
-	state           GameState
-	countdownTicks  int
-	pauseTicks      int
-	tickerDone      chan bool
-	mouthOpen       bool
-	mouthOpenRatio  float64
-	mouthAnimDir    int
-	mouthTicker     *time.Ticker
-	disableMonsters bool
+	app                fyne.App
+	window             fyne.Window
+	game               *Game
+	blockSize          float32
+	canvas             *fyne.Container
+	gameArea           fyne.CanvasObject
+	keyCatcher         *keyCatcher
+	ticker             *time.Ticker
+	tickInterval       time.Duration
+	mapFile            string
+	infoLabel          *widget.Label
+	controlsLabel      *widget.Label
+	state              GameState
+	countdownTicks     int
+	pauseTicks         int
+	tickerDone         chan bool
+	mouthOpen          bool
+	mouthOpenRatio     float64
+	mouthAnimDir       int
+	mouthTicker        *time.Ticker
+	disableMonsters    bool
+	warningBoxCache    map[string]*fyne.Container
+	activeWarningPopup *widget.PopUp
+	activeOverlay      *fyne.Container // For transparent overlays (like settings)
 }
 
 type renderPos struct {
@@ -118,6 +123,7 @@ func RunGUIGame(mapFile string, disableMonsters bool) error {
 }
 
 func (g *GUIGame) showSettings() {
+	resumeState := g.state
 	// Stop game loop while settings are open
 	if g.ticker != nil {
 		g.ticker.Stop()
@@ -185,44 +191,24 @@ func (g *GUIGame) showSettings() {
 			return
 		}
 
-		// If cancelled and game is over or not started, restart fresh
-		if g.state == StateGameOver || g.state == StateSettings {
-			g.startGame()
-			g.initControls()
-			// Ensure focus after dialog closes
-			if g.keyCatcher != nil {
-				g.window.Canvas().Focus(g.keyCatcher)
-			}
-			return
-		}
-
-		// If cancelled and game was running, resume it
-		if g.state == StatePlaying && g.game != nil {
+		// If cancelled, resume previous state without resetting the game.
+		if (resumeState == StatePlaying || resumeState == StateLevelStart || resumeState == StateLevelComplete) && g.game != nil {
 			g.startGameLoop()
-			g.initControls()
-			// Ensure focus after dialog closes
-			if g.keyCatcher != nil {
-				g.window.Canvas().Focus(g.keyCatcher)
-			}
 		}
+		g.initControls()
+		fyne.Do(func() {
+			g.renderGame(g.infoLabel)
+		})
+		// Ensure focus after dialog closes
+		if g.keyCatcher != nil {
+			g.window.Canvas().Focus(g.keyCatcher)
+		}
+		return
 	}
 
-	var d *dialog.ConfirmDialog
-	key := newKeyCatcher(func(ev *fyne.KeyEvent) {
-		if ev.Name == fyne.KeyEscape {
-			handleClose(false)
-			if d != nil {
-				d.Hide()
-			}
-		}
-	})
-	stack := container.NewStack(content, key)
-
-	d = dialog.NewCustomConfirm("Settings", "Apply", "Cancel", stack, func(apply bool) {
+	g.showOverlayDialog("Settings", content, "Apply", "Cancel", func(apply bool) {
 		handleClose(apply)
-	}, g.window)
-	d.Show()
-	g.window.Canvas().Focus(key)
+	}, nil)
 }
 
 func (g *GUIGame) findMapFiles() []string {
@@ -387,6 +373,7 @@ func (g *GUIGame) setupGameUI() {
 	// Key capture overlay to ensure arrow keys are received reliably
 	g.initControls()
 	gameArea := container.NewStack(scroll, g.keyCatcher)
+	g.gameArea = gameArea
 
 	content := container.NewBorder(statusBar, nil, nil, nil, gameArea)
 	minRect := canvas.NewRectangle(color.Transparent)
@@ -499,6 +486,345 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 	// Show/hide controls based on state
 	g.updateControlsVisibility()
 
+	// Render warning overlay on top of the game.
+	if g.game.BustPaused {
+		box := g.newWarningBox("BUSTED!", false, canvasWidth*0.45)
+		size := box.MinSize()
+		box.Resize(size)
+		pos := ui.CenterInBand(fyne.NewSize(canvasWidth, canvasHeight), statusBarHeight, canvasHeight-statusBarHeight, size)
+		box.Move(pos)
+		g.canvas.Add(box)
+	} else if g.state == StateGameOver {
+		box := g.newWarningBox("Game over\nPress arrow to start again\nESC to exit", false, canvasWidth*0.7)
+		size := box.MinSize()
+		box.Resize(size)
+		pos := ui.CenterInBand(fyne.NewSize(canvasWidth, canvasHeight), statusBarHeight, canvasHeight-statusBarHeight, size)
+		box.Move(pos)
+		g.canvas.Add(box)
+	} else if g.state == StateWon {
+		message := fmt.Sprintf("You won!\nFinal score: %d\nPress arrow to start again\nESC to exit", g.game.Score)
+		box := g.newWarningBox(message, false, canvasWidth*0.7)
+		size := box.MinSize()
+		box.Resize(size)
+		pos := ui.CenterInBand(fyne.NewSize(canvasWidth, canvasHeight), statusBarHeight, canvasHeight-statusBarHeight, size)
+		box.Move(pos)
+		g.canvas.Add(box)
+	}
+
+	g.canvas.Refresh()
+}
+
+func (g *GUIGame) newWarningBox(text string, showControls bool, width float32) *fyne.Container {
+	if g.warningBoxCache == nil {
+		g.warningBoxCache = make(map[string]*fyne.Container)
+	}
+
+	key := g.warningBoxCacheKey(text, showControls, width)
+	if cached, ok := g.warningBoxCache[key]; ok {
+		return cached
+	}
+
+	content := g.buildWarningContent(text, showControls)
+	box := g.newWarningBoxFromContent(content, width)
+	g.warningBoxCache[key] = box
+	return box
+}
+
+func (g *GUIGame) warningBoxCacheKey(text string, showControls bool, width float32) string {
+	return fmt.Sprintf("%0.1f|%0.1f|%t|%s", width, g.blockSize, showControls, text)
+}
+
+func (g *GUIGame) buildWarningContent(text string, showControls bool) fyne.CanvasObject {
+	lines := strings.Split(text, "\n")
+	labels := make([]fyne.CanvasObject, 0, len(lines)+1)
+	for i, line := range lines {
+		label := widget.NewLabel(line)
+		label.Alignment = fyne.TextAlignCenter
+		if i == 0 {
+			label.TextStyle = fyne.TextStyle{Bold: true}
+		}
+		labels = append(labels, label)
+	}
+	if showControls {
+		controls := widget.NewLabel("OK / Cancel")
+		controls.Alignment = fyne.TextAlignCenter
+		controls.TextStyle = fyne.TextStyle{Italic: true}
+		labels = append(labels, controls)
+	}
+
+	return container.NewVBox(labels...)
+}
+
+func (g *GUIGame) newWarningBoxFromContent(content fyne.CanvasObject, width float32) *fyne.Container {
+	padding := float32(16)
+	if g.blockSize > 0 {
+		padding = g.blockSize * 0.6
+		if padding < 12 {
+			padding = 12
+		}
+	}
+
+	centered := container.NewCenter(content)
+	contentSize := centered.MinSize()
+
+	if width < contentSize.Width+padding*2 {
+		width = contentSize.Width + padding*2
+	}
+	boxHeight := contentSize.Height + padding*2
+
+	box := container.NewWithoutLayout()
+	box.Resize(fyne.NewSize(width, boxHeight))
+
+	bg := canvas.NewRectangle(color.RGBA{20, 20, 20, 235})
+	bg.Resize(fyne.NewSize(width, boxHeight))
+	box.Add(bg)
+
+	stripeColor := color.RGBA{245, 245, 245, 255}
+	stripeThickness := float32(2)
+	stripeLen := float32(8)
+	if g.blockSize > 0 {
+		stripeLen = g.blockSize * 0.5
+		if stripeLen < 6 {
+			stripeLen = 6
+		}
+	}
+
+	for x := float32(0); x < width; x += stripeLen * 2 {
+		seg := stripeLen
+		if x+seg > width {
+			seg = width - x
+		}
+		top := canvas.NewRectangle(stripeColor)
+		top.Resize(fyne.NewSize(seg, stripeThickness))
+		top.Move(fyne.NewPos(x, 0))
+		box.Add(top)
+
+		bottom := canvas.NewRectangle(stripeColor)
+		bottom.Resize(fyne.NewSize(seg, stripeThickness))
+		bottom.Move(fyne.NewPos(x, boxHeight-stripeThickness))
+		box.Add(bottom)
+	}
+
+	for y := float32(0); y < boxHeight; y += stripeLen * 2 {
+		seg := stripeLen
+		if y+seg > boxHeight {
+			seg = boxHeight - y
+		}
+		left := canvas.NewRectangle(stripeColor)
+		left.Resize(fyne.NewSize(stripeThickness, seg))
+		left.Move(fyne.NewPos(0, y))
+		box.Add(left)
+
+		right := canvas.NewRectangle(stripeColor)
+		right.Resize(fyne.NewSize(stripeThickness, seg))
+		right.Move(fyne.NewPos(width-stripeThickness, y))
+		box.Add(right)
+	}
+
+	centered.Resize(fyne.NewSize(width, boxHeight))
+	box.Add(centered)
+
+	minRect := canvas.NewRectangle(color.Transparent)
+	minRect.Resize(fyne.NewSize(width, boxHeight))
+	return container.NewMax(minRect, box)
+}
+
+func (g *GUIGame) showWarningDialog(title string, content fyne.CanvasObject, okLabel, cancelLabel string, onChoice func(bool), keyHandler func(*fyne.KeyEvent) (bool, bool)) {
+	if g.activeWarningPopup != nil {
+		g.activeWarningPopup.Hide()
+		g.activeWarningPopup = nil
+	}
+
+	if okLabel == "" {
+		okLabel = "OK"
+	}
+
+	originalHandler := g.window.Canvas().OnTypedKey()
+	restoreHandler := func() {
+		if originalHandler != nil {
+			g.window.Canvas().SetOnTypedKey(originalHandler)
+		}
+	}
+	applyChoice := func(ok bool) {
+		if onChoice != nil {
+			onChoice(ok)
+		}
+		if g.activeWarningPopup != nil {
+			g.activeWarningPopup.Hide()
+			g.activeWarningPopup = nil
+		}
+		restoreHandler()
+	}
+
+	defaultKeyHandler := func(ev *fyne.KeyEvent) (bool, bool) {
+		if keyHandler != nil {
+			if handled, ok := keyHandler(ev); handled {
+				return true, ok
+			}
+		}
+		switch ev.Name {
+		case fyne.KeyEscape:
+			return true, false
+		case fyne.KeyReturn, fyne.KeyEnter:
+			return true, true
+		}
+		return false, false
+	}
+
+	buttons := make([]fyne.CanvasObject, 0, 2)
+	if cancelLabel != "" {
+		cancelButton := widget.NewButton(cancelLabel, func() {
+			applyChoice(false)
+		})
+		buttons = append(buttons, cancelButton)
+	}
+	okButton := widget.NewButton(okLabel, func() {
+		applyChoice(true)
+	})
+	buttons = append(buttons, okButton)
+
+	buttonRow := container.NewGridWithColumns(len(buttons), buttons...)
+	inner := content
+	if len(buttons) > 0 {
+		inner = container.NewVBox(content, widget.NewSeparator(), buttonRow)
+	}
+
+	wrapped := g.newWarningBoxFromContent(inner, 420)
+
+	key := newKeyCatcher(func(ev *fyne.KeyEvent) {
+		if closeDialog, ok := defaultKeyHandler(ev); closeDialog {
+			applyChoice(ok)
+		}
+	})
+
+	canvasSize := g.window.Canvas().Size()
+	positioned := container.NewWithoutLayout()
+	positioned.Resize(canvasSize)
+	boxSize := wrapped.MinSize()
+	wrapped.Resize(boxSize)
+	positionWrapped := func() {
+		currentCanvas := g.window.Canvas().Size()
+		gameTop := float32(statusBarHeight)
+		gameHeight := currentCanvas.Height - gameTop
+		ui.PositionInBand(positioned, wrapped, currentCanvas, gameTop, gameHeight)
+	}
+	positionWrapped()
+	positioned.Add(wrapped)
+
+	stack := container.NewStack(positioned, key)
+
+	popup := widget.NewModalPopUp(stack, g.window.Canvas())
+	g.activeWarningPopup = popup
+
+	g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+		if closeDialog, ok := defaultKeyHandler(ev); closeDialog {
+			applyChoice(ok)
+		}
+	})
+
+	popup.Show()
+	popup.Resize(canvasSize)
+	popup.Move(fyne.NewPos(0, 0))
+	positionWrapped()
+	g.window.Canvas().Focus(key)
+}
+
+// showOverlayDialog shows a dialog overlay on top of the game without darkening the background
+func (g *GUIGame) showOverlayDialog(title string, content fyne.CanvasObject, okLabel, cancelLabel string, onChoice func(bool), keyHandler func(*fyne.KeyEvent) (bool, bool)) {
+	// Remove any existing overlay
+	if g.activeOverlay != nil {
+		g.canvas.Remove(g.activeOverlay)
+		g.activeOverlay = nil
+	}
+
+	if okLabel == "" {
+		okLabel = "OK"
+	}
+
+	originalHandler := g.window.Canvas().OnTypedKey()
+	restoreHandler := func() {
+		if originalHandler != nil {
+			g.window.Canvas().SetOnTypedKey(originalHandler)
+		}
+	}
+
+	applyChoice := func(ok bool) {
+		if onChoice != nil {
+			onChoice(ok)
+		}
+		if g.activeOverlay != nil {
+			g.canvas.Remove(g.activeOverlay)
+			g.activeOverlay = nil
+		}
+		restoreHandler()
+	}
+
+	defaultKeyHandler := func(ev *fyne.KeyEvent) (bool, bool) {
+		if keyHandler != nil {
+			if handled, ok := keyHandler(ev); handled {
+				return true, ok
+			}
+		}
+		switch ev.Name {
+		case fyne.KeyEscape:
+			return true, false
+		case fyne.KeyReturn, fyne.KeyEnter:
+			return true, true
+		}
+		return false, false
+	}
+
+	buttons := make([]fyne.CanvasObject, 0, 2)
+	if cancelLabel != "" {
+		cancelButton := widget.NewButton(cancelLabel, func() {
+			applyChoice(false)
+		})
+		buttons = append(buttons, cancelButton)
+	}
+	okButton := widget.NewButton(okLabel, func() {
+		applyChoice(true)
+	})
+	buttons = append(buttons, okButton)
+
+	buttonRow := container.NewGridWithColumns(len(buttons), buttons...)
+	inner := content
+	if len(buttons) > 0 {
+		inner = container.NewVBox(content, widget.NewSeparator(), buttonRow)
+	}
+
+	wrapped := g.newWarningBoxFromContent(inner, 420)
+
+	key := newKeyCatcher(func(ev *fyne.KeyEvent) {
+		if closeDialog, ok := defaultKeyHandler(ev); closeDialog {
+			applyChoice(ok)
+		}
+	})
+
+	canvasSize := g.window.Canvas().Size()
+	boxSize := wrapped.MinSize()
+	wrapped.Resize(boxSize)
+
+	gameTop := float32(statusBarHeight)
+	gameHeight := canvasSize.Height - gameTop
+	pos := ui.CenterInBand(canvasSize, gameTop, gameHeight, boxSize)
+	wrapped.Move(pos)
+
+	// Create overlay container with transparent background and keycatcher
+	overlay := container.NewWithoutLayout(wrapped, key)
+	overlay.Resize(canvasSize)
+	key.Resize(canvasSize)
+	key.Move(fyne.NewPos(0, 0))
+
+	g.activeOverlay = overlay
+	g.canvas.Add(overlay)
+
+	g.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+		if closeDialog, ok := defaultKeyHandler(ev); closeDialog {
+			applyChoice(ok)
+		}
+	})
+
+	g.window.Canvas().Focus(key)
 	g.canvas.Refresh()
 }
 
@@ -874,8 +1200,12 @@ func (g *GUIGame) calculateBlockSize() {
 }
 
 func (g *GUIGame) handleKeyPress(ev *fyne.KeyEvent, infoLabel *widget.Label) {
-	// Handle arrow keys and space after game over to restart
+	// Handle game over / won state
 	if g.state == StateGameOver || g.state == StateWon {
+		if ev.Name == fyne.KeyEscape {
+			g.window.Close()
+			return
+		}
 		switch ev.Name {
 		case fyne.KeyUp, fyne.KeyDown, fyne.KeyLeft, fyne.KeyRight, fyne.KeySpace:
 			if g.ticker != nil {
@@ -885,6 +1215,7 @@ func (g *GUIGame) handleKeyPress(ev *fyne.KeyEvent, infoLabel *widget.Label) {
 			g.startGame()
 			return
 		}
+		return
 	}
 
 	if g.game == nil {
@@ -931,7 +1262,8 @@ func (g *GUIGame) handleKeyPress(ev *fyne.KeyEvent, infoLabel *widget.Label) {
 func (g *GUIGame) handleF2NewGame() {
 	// If game is in progress, show confirmation dialog
 	if g.state == StatePlaying || g.state == StateLevelStart || g.state == StateLevelComplete {
-		dialog.ShowConfirm("New Game", "Start a new game? Current progress will be lost.", func(ok bool) {
+		content := g.buildWarningContent("Start a new game?\nCurrent progress will be lost.", true)
+		g.showWarningDialog("New Game", content, "OK", "Cancel", func(ok bool) {
 			if ok {
 				g.restartGame()
 			}
@@ -939,7 +1271,7 @@ func (g *GUIGame) handleF2NewGame() {
 			if g.keyCatcher != nil {
 				g.window.Canvas().Focus(g.keyCatcher)
 			}
-		}, g.window)
+		}, nil)
 	} else {
 		// Game is over or won, just restart
 		g.restartGame()
@@ -983,14 +1315,17 @@ func (g *GUIGame) startGameLoop() {
 			if g.game.GameOver {
 				g.ticker.Stop()
 				g.state = StateGameOver
+				fyne.DoAndWait(func() {
+					g.renderGame(g.infoLabel)
+				})
 				return
 			}
 
 			if g.game.Won {
 				g.ticker.Stop()
 				g.state = StateWon
-				fyne.Do(func() {
-					dialog.ShowInformation("You Won!", fmt.Sprintf("Final Score: %d", g.game.Score), g.window)
+				fyne.DoAndWait(func() {
+					g.renderGame(g.infoLabel)
 				})
 				return
 			}
@@ -1083,7 +1418,29 @@ func (g *GUIGame) startGameLoop() {
 				}
 			}
 
-			if lifeLost || levelCompleted || g.game.GameOver || g.game.Won {
+			if lifeLost {
+				// Keep the dot visible during the bust animation, then remove it.
+				if pendingDot {
+					if dotY >= 0 && dotY < g.game.CurrentMap.Height && dotX >= 0 && dotX < g.game.CurrentMap.Width {
+						if g.game.CurrentMap.Cells[dotY][dotX] == Empty {
+							g.game.CurrentMap.Cells[dotY][dotX] = Dot
+						}
+					}
+				}
+
+				g.animateMovement(g.infoLabel, startPlayer, endPlayer, startMonsters, endMonsters)
+
+				if pendingDot {
+					g.game.CurrentMap.EatDot(dotX, dotY)
+				}
+
+				fyne.DoAndWait(func() {
+					g.renderGame(g.infoLabel)
+				})
+				continue
+			}
+
+			if levelCompleted || g.game.GameOver || g.game.Won {
 				fyne.DoAndWait(func() {
 					g.renderGame(g.infoLabel)
 				})

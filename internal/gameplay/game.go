@@ -18,7 +18,7 @@ func NewGame(mapsList []maps.Map, disableMonsters bool) *Game {
 		Maps:            mapsList,
 		CurrentLevel:    0,
 		Score:           0,
-		Lives:           3,
+		Lives:           4,
 		DisableMonsters: disableMonsters,
 	}
 
@@ -217,6 +217,18 @@ func (g *Game) Update() {
 
 	// Clear last-tick flags so UI doesn't stay in death/pause state.
 	g.LifeLost = false
+	g.BustPaused = false
+
+	// Pause briefly after a bust so the collision is visible.
+	if g.pendingRespawn {
+		if time.Now().Before(g.bustPauseUntil) {
+			g.BustPaused = true
+			return
+		}
+		g.pendingRespawn = false
+		g.placePlayer()
+		g.placeMonsters()
+	}
 
 	// Store monster positions before they move
 	oldMonsterPos := make([][2]int, len(g.Monsters))
@@ -256,8 +268,9 @@ func (g *Game) Update() {
 				g.LifeLost = false
 			} else {
 				g.LifeLost = true
-				g.placePlayer()
-				g.placeMonsters()
+				g.BustPaused = true
+				g.pendingRespawn = true
+				g.bustPauseUntil = time.Now().Add(1 * time.Second)
 			}
 			return
 		}
@@ -265,14 +278,18 @@ func (g *Game) Update() {
 		// Swap collision (player and monster passed through each other)
 		if g.Player.X == oldMonsterPos[i][0] && g.Player.Y == oldMonsterPos[i][1] &&
 			monster.X == oldPlayerX && monster.Y == oldPlayerY {
+			// Snap the monster onto the player's cell so the bust is visible.
+			g.Monsters[i].X = g.Player.X
+			g.Monsters[i].Y = g.Player.Y
 			g.Lives--
 			if g.Lives <= 0 {
 				g.GameOver = true
 				g.LifeLost = false
 			} else {
 				g.LifeLost = true
-				g.placePlayer()
-				g.placeMonsters()
+				g.BustPaused = true
+				g.pendingRespawn = true
+				g.bustPauseUntil = time.Now().Add(1 * time.Second)
 			}
 			return
 		}
