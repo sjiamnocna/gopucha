@@ -41,27 +41,28 @@ const (
 )
 
 type GUIGame struct {
-	app             fyne.App
-	window          fyne.Window
-	game            *Game
-	blockSize       float32
-	canvas          *fyne.Container
-	keyCatcher      *keyCatcher
-	ticker          *time.Ticker
-	tickInterval    time.Duration
-	mapFile         string
-	infoLabel       *widget.Label
-	controlsLabel   *widget.Label
-	state           GameState
-	countdownTicks  int
-	pauseTicks      int
-	tickerDone      chan bool
-	mouthOpen       bool
-	mouthOpenRatio  float64
-	mouthAnimDir    int
-	mouthTicker     *time.Ticker
-	disableMonsters bool
-	warningBoxCache map[string]*fyne.Container
+	app                fyne.App
+	window             fyne.Window
+	game               *Game
+	blockSize          float32
+	canvas             *fyne.Container
+	gameArea           fyne.CanvasObject
+	keyCatcher         *keyCatcher
+	ticker             *time.Ticker
+	tickInterval       time.Duration
+	mapFile            string
+	infoLabel          *widget.Label
+	controlsLabel      *widget.Label
+	state              GameState
+	countdownTicks     int
+	pauseTicks         int
+	tickerDone         chan bool
+	mouthOpen          bool
+	mouthOpenRatio     float64
+	mouthAnimDir       int
+	mouthTicker        *time.Ticker
+	disableMonsters    bool
+	warningBoxCache    map[string]*fyne.Container
 	activeWarningPopup *widget.PopUp
 }
 
@@ -376,6 +377,7 @@ func (g *GUIGame) setupGameUI() {
 	// Key capture overlay to ensure arrow keys are received reliably
 	g.initControls()
 	gameArea := container.NewStack(scroll, g.keyCatcher)
+	g.gameArea = gameArea
 
 	content := container.NewBorder(statusBar, nil, nil, nil, gameArea)
 	minRect := canvas.NewRectangle(color.Transparent)
@@ -695,7 +697,21 @@ func (g *GUIGame) showWarningDialog(title string, content fyne.CanvasObject, okL
 			applyChoice(ok)
 		}
 	})
-	stack := container.NewStack(container.NewCenter(wrapped), key)
+
+	canvasSize := g.window.Canvas().Size()
+	positioned := container.NewWithoutLayout()
+	positioned.Resize(canvasSize)
+	boxSize := wrapped.MinSize()
+	wrapped.Resize(boxSize)
+	gameTop := float32(statusBarHeight)
+	gameHeight := canvasSize.Height - gameTop
+	x := (canvasSize.Width - boxSize.Width) / 2
+	y := gameTop + (gameHeight-boxSize.Height)/2
+	wrapped.Move(fyne.NewPos(x, y))
+	positioned.Add(wrapped)
+	positioned.Refresh()
+
+	stack := container.NewStack(positioned, key)
 
 	popup := widget.NewModalPopUp(stack, g.window.Canvas())
 	g.activeWarningPopup = popup
@@ -707,6 +723,8 @@ func (g *GUIGame) showWarningDialog(title string, content fyne.CanvasObject, okL
 	})
 
 	popup.Show()
+	popup.Resize(canvasSize)
+	popup.Move(fyne.NewPos(0, 0))
 	g.window.Canvas().Focus(key)
 }
 

@@ -30,6 +30,7 @@ type GUIGame struct {
 	offsetX               float32 // X offset for centering the game
 	offsetY               float32 // Y offset for centering the game
 	canvas                *fyne.Container
+	gameArea              fyne.CanvasObject
 	statusBarHeight       float32
 	keyCatcher            *keyCatcher
 	ticker                *time.Ticker

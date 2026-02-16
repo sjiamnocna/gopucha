@@ -333,6 +333,7 @@ func (g *GUIGame) setupGameUI() {
 	// Key capture overlay to ensure arrow keys are received reliably
 	g.initControls()
 	gameArea := container.NewStack(scroll, g.keyCatcher)
+	g.gameArea = gameArea
 
 	// Combine status bar and game area vertically, filling entire space
 	content := container.NewBorder(statusBar, nil, nil, nil, gameArea)
@@ -738,7 +739,21 @@ func (g *GUIGame) showWarningDialog(title string, content fyne.CanvasObject, okL
 			applyChoice(ok)
 		}
 	})
-	stack := container.NewStack(container.NewCenter(wrapped), key)
+
+	canvasSize := g.window.Canvas().Size()
+	positioned := container.NewWithoutLayout()
+	positioned.Resize(canvasSize)
+	boxSize := wrapped.MinSize()
+	wrapped.Resize(boxSize)
+	gameTop := g.currentStatusBarHeight()
+	gameHeight := canvasSize.Height - gameTop
+	x := (canvasSize.Width - boxSize.Width) / 2
+	y := gameTop + (gameHeight-boxSize.Height)/2
+	wrapped.Move(fyne.NewPos(x, y))
+	positioned.Add(wrapped)
+	positioned.Refresh()
+
+	stack := container.NewStack(positioned, key)
 
 	popup := widget.NewModalPopUp(stack, g.window.Canvas())
 	g.activeWarningPopup = popup
@@ -750,6 +765,8 @@ func (g *GUIGame) showWarningDialog(title string, content fyne.CanvasObject, okL
 	})
 
 	popup.Show()
+	popup.Resize(canvasSize)
+	popup.Move(fyne.NewPos(0, 0))
 	g.window.Canvas().Focus(key)
 }
 
