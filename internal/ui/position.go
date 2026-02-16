@@ -10,8 +10,8 @@ func CenterInBand(canvasSize fyne.Size, bandTop, bandHeight float32, boxSize fyn
 	sx := canvasSize.Width - boxSize.Width
 	sy := bandHeight - boxSize.Height
 
-	x := sx * (2.2 / 7.0) - 0.4 * boxSize.Width // Center at 1/7 of the canvas width
-	y := sy * (2.5 / 7.0)  // Center at 1/3 of the band height
+	x := sx*(2.2/7.0) - 0.4*boxSize.Width // Center at 1/7 of the canvas width
+	y := sy * (2.5 / 7.0)                 // Center at 1/3 of the band height
 	return fyne.NewPos(x, y)
 }
 

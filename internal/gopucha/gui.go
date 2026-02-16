@@ -495,14 +495,14 @@ func (g *GUIGame) renderGameAt(infoLabel *widget.Label, playerPos renderPos, mon
 		box.Move(pos)
 		g.canvas.Add(box)
 	} else if g.state == StateGameOver {
-		box := g.newWarningBox("Game over\nPress arrow to start again", false, canvasWidth*0.7)
+		box := g.newWarningBox("Game over\nPress arrow to start again\nESC to exit", false, canvasWidth*0.7)
 		size := box.MinSize()
 		box.Resize(size)
 		pos := ui.CenterInBand(fyne.NewSize(canvasWidth, canvasHeight), statusBarHeight, canvasHeight-statusBarHeight, size)
 		box.Move(pos)
 		g.canvas.Add(box)
 	} else if g.state == StateWon {
-		message := fmt.Sprintf("You won!\nFinal score: %d\nPress arrow to start again", g.game.Score)
+		message := fmt.Sprintf("You won!\nFinal score: %d\nPress arrow to start again\nESC to exit", g.game.Score)
 		box := g.newWarningBox(message, false, canvasWidth*0.7)
 		size := box.MinSize()
 		box.Resize(size)
@@ -1200,8 +1200,12 @@ func (g *GUIGame) calculateBlockSize() {
 }
 
 func (g *GUIGame) handleKeyPress(ev *fyne.KeyEvent, infoLabel *widget.Label) {
-	// Handle arrow keys and space after game over to restart
+	// Handle game over / won state
 	if g.state == StateGameOver || g.state == StateWon {
+		if ev.Name == fyne.KeyEscape {
+			g.window.Close()
+			return
+		}
 		switch ev.Name {
 		case fyne.KeyUp, fyne.KeyDown, fyne.KeyLeft, fyne.KeyRight, fyne.KeySpace:
 			if g.ticker != nil {
@@ -1211,6 +1215,7 @@ func (g *GUIGame) handleKeyPress(ev *fyne.KeyEvent, infoLabel *widget.Label) {
 			g.startGame()
 			return
 		}
+		return
 	}
 
 	if g.game == nil {
