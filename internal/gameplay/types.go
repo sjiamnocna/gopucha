@@ -22,6 +22,7 @@ type Game struct {
 	DotEaten             bool
 	CurrentSpeedModifier float64
 	LevelCompleted       bool
+	BustPaused           bool
 	bustPauseUntil       time.Time
 	pendingRespawn       bool
 }

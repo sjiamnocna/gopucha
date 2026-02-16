@@ -4,10 +4,11 @@
 package ui
 
 import (
+	"time"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/widget"
 	"github.com/sjiamnocna/gopucha/internal/gameplay"
-	"time"
 )
 
 type GameState int
@@ -50,6 +51,8 @@ type GUIGame struct {
 	monsterTeethBlink     bool
 	monsterTeethBlinkLast time.Time
 	cachedMapRender       []fyne.CanvasObject // Cached static map layer
+	warningBoxCache       map[string]*fyne.Container
+	activeWarningPopup    *widget.PopUp
 }
 
 type renderPos struct {
