@@ -19,6 +19,7 @@ import (
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
+	"github.com/sjiamnocna/gopucha/internal/ui"
 )
 
 const (
@@ -121,6 +122,7 @@ func RunGUIGame(mapFile string, disableMonsters bool) error {
 }
 
 func (g *GUIGame) showSettings() {
+	resumeState := g.state
 	// Stop game loop while settings are open
 	if g.ticker != nil {
 		g.ticker.Stop()
@@ -188,26 +190,19 @@ func (g *GUIGame) showSettings() {
 			return
 		}
 
-		// If cancelled and game is over or not started, restart fresh
-		if g.state == StateGameOver || g.state == StateSettings {
-			g.startGame()
-			g.initControls()
-			// Ensure focus after dialog closes
-			if g.keyCatcher != nil {
-				g.window.Canvas().Focus(g.keyCatcher)
-			}
-			return
-		}
-
-		// If cancelled and game was running, resume it
-		if g.state == StatePlaying && g.game != nil {
+		// If cancelled, resume previous state without resetting the game.
+		if (resumeState == StatePlaying || resumeState == StateLevelStart || resumeState == StateLevelComplete) && g.game != nil {
 			g.startGameLoop()
-			g.initControls()
-			// Ensure focus after dialog closes
-			if g.keyCatcher != nil {
-				g.window.Canvas().Focus(g.keyCatcher)
-			}
 		}
+		g.initControls()
+		fyne.Do(func() {
+			g.renderGame(g.infoLabel)
+		})
+		// Ensure focus after dialog closes
+		if g.keyCatcher != nil {
+			g.window.Canvas().Focus(g.keyCatcher)
+		}
+		return
 	}
 
 	g.showWarningDialog("Settings", content, "Apply", "Cancel", func(apply bool) {
@@ -703,13 +698,14 @@ func (g *GUIGame) showWarningDialog(title string, content fyne.CanvasObject, okL
 	positioned.Resize(canvasSize)
 	boxSize := wrapped.MinSize()
 	wrapped.Resize(boxSize)
-	gameTop := float32(statusBarHeight)
-	gameHeight := canvasSize.Height - gameTop
-	x := (canvasSize.Width - boxSize.Width) / 2
-	y := gameTop + (gameHeight-boxSize.Height)/2
-	wrapped.Move(fyne.NewPos(x, y))
+	positionWrapped := func() {
+		currentCanvas := g.window.Canvas().Size()
+		gameTop := float32(statusBarHeight)
+		gameHeight := currentCanvas.Height - gameTop
+		ui.PositionInBand(positioned, wrapped, currentCanvas, gameTop, gameHeight)
+	}
+	positionWrapped()
 	positioned.Add(wrapped)
-	positioned.Refresh()
 
 	stack := container.NewStack(positioned, key)
 
@@ -725,6 +721,7 @@ func (g *GUIGame) showWarningDialog(title string, content fyne.CanvasObject, okL
 	popup.Show()
 	popup.Resize(canvasSize)
 	popup.Move(fyne.NewPos(0, 0))
+	positionWrapped()
 	g.window.Canvas().Focus(key)
 }
 
