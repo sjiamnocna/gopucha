@@ -275,6 +275,9 @@ func (g *Game) Update() {
 		// Swap collision (player and monster passed through each other)
 		if g.Player.X == oldMonsterPos[i][0] && g.Player.Y == oldMonsterPos[i][1] &&
 			monster.X == oldPlayerX && monster.Y == oldPlayerY {
+			// Snap the monster onto the player's cell so the bust is visible.
+			g.Monsters[i].X = g.Player.X
+			g.Monsters[i].Y = g.Player.Y
 			g.Lives--
 			if g.Lives <= 0 {
 				g.GameOver = true

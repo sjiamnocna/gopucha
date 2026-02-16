@@ -1083,7 +1083,29 @@ func (g *GUIGame) startGameLoop() {
 				}
 			}
 
-			if lifeLost || levelCompleted || g.game.GameOver || g.game.Won {
+			if lifeLost {
+				// Keep the dot visible during the bust animation, then remove it.
+				if pendingDot {
+					if dotY >= 0 && dotY < g.game.CurrentMap.Height && dotX >= 0 && dotX < g.game.CurrentMap.Width {
+						if g.game.CurrentMap.Cells[dotY][dotX] == Empty {
+							g.game.CurrentMap.Cells[dotY][dotX] = Dot
+						}
+					}
+				}
+
+				g.animateMovement(g.infoLabel, startPlayer, endPlayer, startMonsters, endMonsters)
+
+				if pendingDot {
+					g.game.CurrentMap.EatDot(dotX, dotY)
+				}
+
+				fyne.DoAndWait(func() {
+					g.renderGame(g.infoLabel)
+				})
+				continue
+			}
+
+			if levelCompleted || g.game.GameOver || g.game.Won {
 				fyne.DoAndWait(func() {
 					g.renderGame(g.infoLabel)
 				})
