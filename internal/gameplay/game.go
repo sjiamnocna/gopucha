@@ -18,7 +18,7 @@ func NewGame(mapsList []maps.Map, disableMonsters bool) *Game {
 		Maps:            mapsList,
 		CurrentLevel:    0,
 		Score:           0,
-		Lives:           3,
+		Lives:           4,
 		DisableMonsters: disableMonsters,
 	}
 
