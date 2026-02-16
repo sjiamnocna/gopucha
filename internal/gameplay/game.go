@@ -218,6 +218,16 @@ func (g *Game) Update() {
 	// Clear last-tick flags so UI doesn't stay in death/pause state.
 	g.LifeLost = false
 
+	// Pause briefly after a bust so the collision is visible.
+	if g.pendingRespawn {
+		if time.Now().Before(g.bustPauseUntil) {
+			return
+		}
+		g.pendingRespawn = false
+		g.placePlayer()
+		g.placeMonsters()
+	}
+
 	// Store monster positions before they move
 	oldMonsterPos := make([][2]int, len(g.Monsters))
 	for i := range g.Monsters {
@@ -256,8 +266,8 @@ func (g *Game) Update() {
 				g.LifeLost = false
 			} else {
 				g.LifeLost = true
-				g.placePlayer()
-				g.placeMonsters()
+				g.pendingRespawn = true
+				g.bustPauseUntil = time.Now().Add(1 * time.Second)
 			}
 			return
 		}
@@ -271,8 +281,8 @@ func (g *Game) Update() {
 				g.LifeLost = false
 			} else {
 				g.LifeLost = true
-				g.placePlayer()
-				g.placeMonsters()
+				g.pendingRespawn = true
+				g.bustPauseUntil = time.Now().Add(1 * time.Second)
 			}
 			return
 		}

@@ -1,6 +1,8 @@
 package gameplay
 
 import (
+	"time"
+
 	"github.com/sjiamnocna/gopucha/internal/actors"
 	"github.com/sjiamnocna/gopucha/internal/maps"
 )
@@ -20,4 +22,6 @@ type Game struct {
 	DotEaten             bool
 	CurrentSpeedModifier float64
 	LevelCompleted       bool
+	bustPauseUntil        time.Time
+	pendingRespawn        bool
 }
