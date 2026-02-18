@@ -75,11 +75,32 @@ jobs:
             sleep 10
           done
 
-      - name: Build
+      - name: Install macOS deps
+        if: matrix.os == 'macos-latest'
+        run: |
+          go install fyne.io/fyne/v2/cmd/fyne@latest
+
+      - name: Build (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          mkdir -p bin
+          # Build as .app bundle for proper macOS compatibility
+          go build \
+          -trimpath \
+          -buildvcs=false \
+          -ldflags="-s -w -X 'main.version=${GITHUB_REF_NAME}' -X 'main.commit=${GITHUB_SHA}'" \
+          -o "bin/${{ matrix.bin }}" ./cmd/gopucha
+          # Create .app bundle
+          $(go env GOPATH)/bin/fyne package -os darwin -executable "bin/${{ matrix.bin }}" -name Gopucha -icon assets/icon.png 2>/dev/null || \
+          $(go env GOPATH)/bin/fyne package -os darwin -executable "bin/${{ matrix.bin }}" -name Gopucha
+          # Keep both the binary and the .app for distribution
+        shell: bash
+
+      - name: Build (Linux/Windows)
+        if: matrix.os != 'macos-latest'
         run: |
           mkdir -p bin
           go build \
-          -tags gui \
           -trimpath \
           -buildvcs=false \
           -ldflags="-s -w -X 'main.version=${GITHUB_REF_NAME}' -X 'main.commit=${GITHUB_SHA}'" \
@@ -90,6 +111,10 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: |
           mkdir -p dist/package
+          # Include .app bundle for macOS if it exists
+          if [ -d "Gopucha.app" ]; then
+            cp -r "Gopucha.app" "dist/package/"
+          fi
           cp "bin/${{ matrix.bin }}" "dist/package/${{ matrix.bin }}"
           cp -r maps "dist/package/"
           cd dist

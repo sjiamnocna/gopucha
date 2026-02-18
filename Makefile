@@ -14,7 +14,6 @@ export CGO_ENABLED
 
 BIN_DIR := bin
 BIN_PATH := $(BIN_DIR)/$(APP_NAME)
-MAPGEN_BIN := $(BIN_DIR)/mapgen
 MAPS_DIR := maps
 
 # Build flags for optimization
